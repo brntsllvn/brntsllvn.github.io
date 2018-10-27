@@ -50,5 +50,8 @@ DEPENDENCIES
   minima (~> 2.0)
   tzinfo-data
 
+RUBY VERSION
+   ruby 2.5.3p105
+
 BUNDLED WITH
-   1.15.1
+   1.16.6
