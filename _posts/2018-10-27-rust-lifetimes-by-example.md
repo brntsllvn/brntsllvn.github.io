@@ -5,23 +5,15 @@ date:   2018-10-27 20:00:00 -0700
 categories: rust
 ---
 
-# Rust Lifetimes by Example
-
 ## Introduction
 
-Rust is a statically-typed, functional language that compiles to
-WebAssembly and uses _lifetimes_, rather than garbage-collection, to
-manage memory.
+Rust is a statically-typed, functional language that compiles to WebAssembly and uses _lifetimes_, rather than garbage-collection, to manage memory.
 
 But why? 
 
-Garbage collectors for languages like C# and Ruby constantly 
-_mark and sweep_ objects on the heap. Program
-performance degrades to pay the cost of garbage collection.
+Garbage-collected languages like C# and Ruby constantly _mark and sweep_ objects on the heap. Depending on the number of live objects, the program pays a performance cost usually called "GC pause time."
 
-Without garbage collection, Rust is more like C, leaving 
-memory management up to the developer. A common issue in C code 
-is the "use after free" (UaF) bug.
+Without garbage collection, Rust is more like C, leaving memory management up to the developer. A common issue in C code is the "use after free" (UaF) bug. The C program below tries to access memory that the program has freed. The result is a seg fault.
 
 ```c
 int main() {
@@ -36,9 +28,7 @@ $ ./ex
 Segmentation fault: 11
 ```
 
-Rust prevents UaF bugs by statically analyzing code
-_at compile time_ and refusing to produce an executable until the 
-developer corrects the issue. Looking at roughly equivalent Rust code:
+Rust prevents UaF bugs by statically analyzing code _at compile time_ and refusing to produce an executable until the developer corrects the bug. Looking at Rust code roughly equivalent to the C code above...
 
 ```rust
 fn main() {
@@ -51,7 +41,7 @@ fn main() {
 }
 ```
 
-And compiling, we get:
+...and compiling, we get:
 
 ```rust
         str = &greet;
@@ -63,15 +53,11 @@ And compiling, we get:
 - borrowed value needs to live until here
 ```
 
-To facilitate compile time checking, Rust developers must tell the
-compiler how long a binding to a reference is valid. In other words, 
-she must describe the _lifetime_ of the reference.
+To facilitate compile-time checking, Rust developers tell the compiler how long a binding to a reference is valid. In other words, she must describe the _lifetime_ of the reference.
 
 ## Lifetimes Case 0: The Borrow Checker
 
-The _borrow checker_ is the part of the Rust compiler that identifies
-UaF and other common memory management bugs. It analyzes the 
-function signature first.
+The _borrow checker_ is the part of the Rust compiler that identifies UaF and other common memory management bugs. In the case of functions, it examines the function signature first.
 
 ```rust
 fn f() -> &i32 {
@@ -90,18 +76,10 @@ fn f() -> &i32 {
 ```
 
 Each part of the error message is useful for understanding lifetimes.
-1) this is an error: rustc will not produce an executable until this
-issue is resolved
-2) rustc "expected lifetime parameter," which means it cannot infer
-the lifetime of the reference the function returns
-3) the first "help" suggestion "this function's return type contains 
-a borrowed value, but there is no value for it to be borrowed from"
-provides the a possible solution to the problem: specify 
-an input parameter which the returned value borrows from.
-4) the second "help" suggestion "consider giving it a 'static 
-lifetime" provides another possible solution: return static data,
-(i.e. immutable data with known size at compile time), so that
-the binding is always valid.
++ This is an error: the Rust compiler will not produce an executable until this issue is resolved.
++ The Rust compiler "expected [a] lifetime parameter," which means it cannot infer the lifetime of the borrow the function returns.
++ The first "help" suggestion "this function's return type contains a borrowed value, but there is no value for it to be borrowed from" provides the a possible solution to the problem: specify an input parameter which the returned value borrows from.
++ the second "help" suggestion "consider giving it a 'static lifetime" provides another possible solution: return static data, (i.e. immutable data with known size at compile time), so that the binding is always valid.
 
 Let's try both solutions starting with making the reference always 
 valid.
@@ -112,21 +90,11 @@ fn f1() -> &'static i32 {
 }
 ```
 
-After adding the `'static` lifetime annotation, the borrow checker 
-moves past the function signature, so we must 
-specify a function body that satisfies the signature (which 
-explains the `&1`).
+After adding the `'static` lifetime annotation, the borrow checker moves past the function signature, so we must specify a function body that satisfies the signature. In this case, `&1`, will suffice.
 
-How does the borrow checker know there is a problem before looking at 
-the function body? Since the function originally returns a borrowed 
-`i32`, written `&i32`, the borrowed value _must_ come from somewhere. 
+How does the borrow checker know there is a problem only looking at the signature? Since the function originally returns a borrowed `i32`, written `&i32`, the borrowed value _must_ come from somewhere. 
 
-The borrowed value could come from the function body, as we showed
-in function `f1` above, but this only works because the `&1` is 
-static and not bound to a variable (As Klabnik and Nichols, 
-authors of "The Rust Programming Language", say "the 
-text is hardcoded directly into the final executable") and is 
-therefore never dropped. There is no risk of a UaF bug.
+The borrowed value could come from the function body, as we showed in function `f1` above, but this only works because the `&1` is static and not bound to a variable (As Klabnik and Nichols, authors of "The Rust Programming Language", say "the text is hardcoded directly into the final executable") and is therefore never dropped. There is no risk of a UaF bug.
 
 Note: `f1` is equivalent to the following, which explicitly
 declares the static item, then returns it.
@@ -138,14 +106,9 @@ fn f2() -> &'static i32 {
 }
 ```
 
-Static data (like a literal `1` or `'hello'`) are not very useful 
-for understanding lifetimes since their lifetimes are the 
-lifetime of the program. Going forward I will use allocated data 
-that live on the heap to dig into the details.
+Static data (like a literal `1` or `"hello"`) are not very useful for understanding lifetimes since their lifetimes are the lifetime of the program. Lifetimes are mostly interesting when we write code binding references to variables and the underlying data live on the heap.
 
-Trying the borrow checker's other suggestion, providing a 
-parameter, also compiles successfully, even though
-the parameter has nothing to do with the `&i32` returned: 
+Trying the borrow checker's other suggestion, providing a parameter, also compiles successfully, even though the parameter, `x`, has nothing to do with the `&i32` returned:
 
 ```rust
 fn f3(x: &i32) -> &i32 {
@@ -153,9 +116,7 @@ fn f3(x: &i32) -> &i32 {
 }
 ```
 
-This compiles but, again, is not very interesting because the 
-returned value is static. The following is more interesting (even
-though it appears to do exactly the same thing):
+This compiles but, again, is not very interesting because the returned value is static. The following is more interesting (even though it appears to do exactly the same thing):
 
 ```rust
 fn f4(x: &i32) -> &i32 {
@@ -164,10 +125,7 @@ fn f4(x: &i32) -> &i32 {
 }
 ```
 
-`f4` declares a variable, `y`, and binds a value, then returns 
-a reference to that value. The key difference is that `y` goes
-out of scope when the function body closes and therefore `f4` 
-does not compile:
+`f4` declares a variable, `y`, and binds a value, then returns a reference to that value. The key difference is that `y` goes out of scope when the function body closes and therefore `f4` does not compile:
 
 ```rust
     &y
@@ -176,16 +134,11 @@ does not compile:
 - borrowed value only lives until here
 ```
 
-The concept that a returned reference _must_ originate from the 
-input parameters (except in the case of static variables), 
-as the borrow checker first checks, is important for understanding 
-the example provided in Klabnik and Nichols' 
-"The Rust Programming Language", which I discuss in the next section.
+Excluding static items, if a function returns a borrow (i.e. contains `&`) then the source of the borrow _must_ be a borrow passed in as an input paramter since variables created in the function body will be dropped when the function body closes. This is important for understanding an example provided in Klabnik and Nichols', which I discuss in the next section.
 
 ## Lifetimes Case 1: Function Parameter Lifetime Ambiguity
 
-Klabnik and Nichols provide the following example in the 2018 version
-of their book:
+Klabnik and Nichols provide the following example in the 2018 version of their book:
 
 ```rust
 fn longest(x: &str, y: &str) -> &str {
@@ -197,8 +150,7 @@ fn longest(x: &str, y: &str) -> &str {
 }
 ```
 
-The borrow checker errors with "expected lifetime parameter" as we saw
-earlier, but provides a new suggestion.
+The borrow checker errors with "expected lifetime parameter" as we saw earlier, but provides a new suggestion.
 
 ```rust
 fn longest(x: &str, y: &str) -> &str {
@@ -207,13 +159,7 @@ fn longest(x: &str, y: &str) -> &str {
   = help: this function's return type contains a borrowed value, but the signature does not say whether it is borrowed from `x` or `y`
 ```
 
-The borrow checker mentions that the return type contains a
-borrowed value, but "the signature does not say whether it 
-is borrowed from `x` or `y`." Excluding the case of static items,
-if a function returns a reference, then the reference must 
-originate from one of the function's inputs (since references 
-created in the function body are dropped when the function
-body closes).
+The borrow checker mentions that the return type contains a borrowed value, but "the signature does not say whether it is borrowed from `x` or `y`." Excluding the case of static items, if a function returns a reference, then the reference must originate from one of the function's inputs.
 
 But if there is more than one input parameter,
 which one should the borrow checker check still points to 
