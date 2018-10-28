@@ -82,13 +82,12 @@ error[E0106]: missing lifetime specifier
 ```
 
 Each part of the error message is useful for understanding lifetimes:
-+ This is an error: the Rust compiler will not produce an executable until this issue is resolved.
-+ The Rust compiler "expected [a] lifetime parameter," which means it cannot infer the lifetime of the borrow the function returns.
-+ The first "help" suggestion - "this function's return type contains a borrowed value, but there is no value for it to be borrowed from" - provides a possible solution: specify an input parameter which the returned value borrows from.
-+ The second "help" suggestion - "consider giving it a `'static` lifetime" - provides another possible solution: return static data, (i.e. immutable data with known size at compile time), so that the binding is always valid.
++ This is an error: the Rust compiler will not produce an executable until I resolve the issue.
++ The Rust compiler "expected [a] lifetime parameter" and cannot infer the lifetime of the returned borrow.
++ The first "help" suggestion - "this function's return type contains a borrowed value, but there is no value for it to be borrowed from" - provides a solution: add a parameter which the returned value borrows from.
++ The second "help" suggestion - "consider giving it a `'static` lifetime" - provides another solution: return static data, (i.e. immutable data with known size at compile time), so that the binding is always valid.
 
-Let's try both solutions starting with making the reference always 
-valid.
+Let's try both solutions starting with adding the `'static` lifetime annotation.
 
 ```rust
 fn f1() -> &'static i32 {
@@ -98,7 +97,7 @@ fn f1() -> &'static i32 {
 
 After adding the `'static` lifetime annotation, the borrow checker moves past the function signature, so we add a minimal function body, `&1`, satisfying the signature, and the code compiles.
 
-Note: string literals, like `"hello"`, and globals, like `77756`, live in the [data segment](https://en.wikipedia.org/wiki/Data_segment) of the resulting binary, separate from the heap. Rust only drops items on the heap and therefore literals and globals have a lifetime equal to the [lifetime of the whole program](https://doc.rust-lang.org/book/first-edition/lifetimes.html#static).
+Note: string literals, like `"hello"`, and globals, like `77756`, live in the [data segment](https://en.wikipedia.org/wiki/Data_segment) of the resulting binary, separate from the heap. Rust only drops items on the heap and therefore literals and globals have a lifetime of the [whole program](https://doc.rust-lang.org/book/first-edition/lifetimes.html#static).
 
 Trying the borrow checker's other suggestion - adding a parameter - also compiles successfully, even though the parameter, `x`, has nothing to do with the `&i32` returned:
 
@@ -108,7 +107,7 @@ fn f2(x: &i32) -> &i32 {
 }
 ```
 
-This compiles but, again, is not very interesting because the returned value is static. The following is more interesting (even though it appears to do exactly the same thing):
+This compiles but is not very interesting because the returned value is static. The following, `f3`, is more interesting and appears to do the same thing as `f2`.
 
 ```rust
 fn f3(x: &i32) -> &i32 {
@@ -117,7 +116,7 @@ fn f3(x: &i32) -> &i32 {
 }
 ```
 
-`f3` declares a variable, `y`, binds a value, and returns a reference to that value. The key difference is that `y` goes out of scope when the function body closes and therefore `f3` does not compile:
+`f3` declares a variable, `y`, binds a value, and returns a borrow of that value. The key difference is that `y` goes out of scope when the function body closes introducing UaF and therefore `f3` does not compile:
 
 ```rust
 error[E0597]: `y` does not live long enough
@@ -129,7 +128,7 @@ error[E0597]: `y` does not live long enough
   | - borrowed value only lives until here
 ```
 
-Excluding static items, if a function returns a borrow (i.e. contains `&`) then the source of the borrow _must_ be a borrow passed in as an input paramter since variables created in the function body will be dropped when the function body closes. This is important for understanding an example provided in "The Rust Programming Language" by Klabnik and Nichols, which I discuss in the next section.
+Excluding static items, a function returning a borrow _must_ receive that borrow as a parameter since variables created in the function body will be dropped when the function body closes. This is important for understanding an example provided in "The Rust Programming Language" by Klabnik and Nichols, which I discuss in the next section.
 
 ## Function Parameters
 
@@ -157,11 +156,9 @@ error[E0106]: missing lifetime specifier
   = help: this function's return type contains a borrowed value, but the signature does not say whether it is borrowed from `x` or `y`
 ```
 
-Rust's borrow checker mentions that the return type contains a borrowed value, but "the signature does not say whether it is borrowed from `x` or `y`." Excluding the case of static items, if a function returns a reference, then the reference must originate from one of the function's parameters.
+Rust's borrow checker explains that "the signature does not say whether [the returned borrow] is borrowed from `x` or `y`." In other words, if the function has more than one parameter, which one should Rust's borrow checker examine for UaF?
 
-If there is more than one input parameter, which one should the borrow checker validate?
-
-Both, it turns out. Using a lifetime annotation, `'a`, tells Rust's borrow checker that the returned borrow has the same lifetime as both of the parameter borrows.
+Both, it turns out. Using a lifetime annotation, `'a`, tells Rust's borrow checker that the returned borrow must have the same lifetime as both of the parameter borrows.
                     
 ```rust
 fn longest<'a>(x: &'a str, y: &'a str) -> &'a str {
@@ -173,9 +170,7 @@ fn longest<'a>(x: &'a str, y: &'a str) -> &'a str {
 }
 ```
 
-> **A quick aside...** Providing instructions, via lifetime annotations, to the compiler, confused me when I first encountered it. Coming from C# and rarely thinking about memory management (aside from disposing _unmanaged_ resources), this was a [broadening](https://www.newyorker.com/magazine/1995/01/30/an-interval) opportunity for me. I recently visited [Kevin Lynagh](https://twitter.com/lynaghk) in Kraków, Poland and he suggested experimenting, as a physicist would in a laboratory, by systematically forming a hypothesis and proving or disproving using a small experiment. What follows is the _result_ of that approach (but, to be clear, is not a demonstration of that approach).
-
- Stepping back, I am going to build the function from scratch with the goal of understanding how lifetimes work. Take the following example:
+Stepping back, I am going to build `longest` from scratch with the goal of illustrating when Rust's borrow checker needs lifetime annotations and how it uses them. Take the following simplified example:
 
 ```rust
 fn longest1(x: &str) -> &str {
@@ -183,9 +178,9 @@ fn longest1(x: &str) -> &str {
 }
 ```
 
-Comparing the original `longest` to `longest1` the first thing that sticks out regarding lifetime annotations is that there are none; they have be _elided_ (i.e. omitted). Since there is only one input parameter, the borrow checker can infer which value the returned borrow refers to in order to check it is still valid. 
+Comparing the Klabnik and Nichols' `longest` to `longest1` the first thing that sticks out regarding lifetime annotations is that there are none; they have be _elided_ (i.e. omitted). Since there is only one input parameter, the borrow checker can infer which value the returned borrow refers to in order to check that value is still valid.
 
-Note: we can always include lifetime annotations. The following is equivalent to `longest1`.
+Note: In the case above, lifetime annotations are optional. The following is equivalent to `longest1`.
 
 ```rust
 fn longest2<'a>(x: &'a str) -> &'a str {
@@ -221,10 +216,9 @@ error[E0106]: missing lifetime specifier
   = help: this function's return type contains a borrowed value, but the signature does not say whether it is borrowed from `x` or `y`
 ```
 
-Before introducing any conditional logic into the function body, we are back where we started with the "signature does not say whether it is borrowed 
-from `x` or `y`" error. 
+Before introducing any conditional logic into the function body, I am back where I started with the "signature does not say whether it is borrowed from `x` or `y`" error. 
 
-Introducing lifetime annotations no the parameter used in the function body, `x`, resolves the issue.
+Introducing a lifetime annotation, `'a` on the parameter used in the function body, `x`, resolves the issue.
 
 ```rust
 fn longest5<'a>(x: &'a str, y: &i32) -> &'a str {
@@ -232,9 +226,7 @@ fn longest5<'a>(x: &'a str, y: &i32) -> &'a str {
 }
 ```
 
-The above function, `longest5`, explicitly ties together the lifetime of the input parameter `x` and the lifetime of the returned borrow. Lifetime annotations do nothing other than tell the compiler how to validate references are still valid.
-
-What does `longest5` tell us in practice? The following example sheds light on how lifetime annotations connect underlying values. (here, I borrow Klabnik and Nichols' helpful lifetime comment/illustrations).
+`longest5` uses a lifetime annotation, `'a`, to communicate to Rust's borrow checker that parameter `x` and the returned borrow have the same lifetime. The following example illustrates how the lifetime annotation helps Rust's borrow checker. (here, I borrow Klabnik and Nichols' helpful lifetime comment/illustrations).
 
 ```rust
 fn main() {
@@ -251,9 +243,9 @@ fn longest6<'a>(x: &'a str, y: &str) -> &'a str {
 }
 ```
 
-Above, I define a `main` function that itself defines some values, an internal scope which calls `longest6` and then prints.`longest6` is the closest thing to the original `longest` we have seen because both inputs are of type `&str`.
+Above, I define a `main` function that defines some values, an internal scope which calls `longest6`, and then prints.`longest6` is the closest thing to the original `longest` we have seen because both inputs are string slices, `&str`.
 
-In the following example, I move one step closer to the original `longest` by actually doing something with `y` in the function body. It makes no difference.
+In the following example, I move one step closer to the original `longest` by actually doing something with `y` in the function body. Since `longest6` cannot return `y`, the lifetime of `y` is irrelevant and Rust's borrow checker confirms there is no UaF by successfully compiling.
 
 ```rust
 fn main() {
@@ -271,7 +263,7 @@ fn longest6<'a>(x: &'a str, y: &str) -> &'a str {
 }
 ```
 
-Using the same runner, `longest7` now looks very similar to the original `longest`, but we run into a problem.
+Using the same runner, and creating `longest7`, which is nearly identical to the original `longest`, we run into a problem:
 
 ```rust
 fn main() {
@@ -292,7 +284,7 @@ fn longest7<'a>(x: &'a str, y: &str) -> &'a str {
 }
 ```
 
-The difference between `longest7` and the original `longest` is that I have not included the lifetime annotation on the `y` parameter. This does not compile since the borrow checker identifies that `longest7` could return `y`. The Rust compiler tells us what to do:
+The difference between `longest7` and the original `longest` is that I have not included the lifetime annotation on the `y` parameter. Rust's borrow checker identifies that `longest7` could return `y` and throws a (surprisingly helpful) error:
 
 ```rust
 error[E0621]: explicit lifetime required in the type of `y`
@@ -305,7 +297,7 @@ error[E0621]: explicit lifetime required in the type of `y`
    |         ^ lifetime `'a` required
 ```
 
-Adding a lifetime annotation to parameter `y` finally makes this function the Klabnik and Nichols' original `longest`.
+Adding a lifetime annotation to parameter `y` finally makes the function identical to Klabnik and Nichols' original `longest`.
 
 ```rust
 fn main() {
@@ -314,7 +306,7 @@ fn main() {
         let some_str = String::from("bye");     // ---+-- 'b  |
         longer = longest("hi", &some_str);      //    |       |
     }                                           // ---+       |
-    println!("{}", longer);                     //            | some_str is dead, and the borrow checker is still mad
+    println!("{}", longer);                     //            | some_str is dead, and the borrow checker is mad
 }                                               // -----------+
 
 fn longest<'a>(x: &'a str, y: &'a str) -> &'a str {
@@ -326,7 +318,7 @@ fn longest<'a>(x: &'a str, y: &'a str) -> &'a str {
 }
 ```
 
-When I compiler the code above, I get the following:
+When I compile the code above, I get the following:
 
 ```rust
 error[E0597]: `some_str` does not live long enough
@@ -336,12 +328,12 @@ error[E0597]: `some_str` does not live long enough
   |                                 ^^^^^^^^ borrowed value does not live long enough
 6 |     }                                           // ---+       |
   |     - `some_str` dropped here while still borrowed
-7 |     println!("{}", longer);                     //            | some_str is dead, but now longer cares
+7 |     println!("{}", longer);                     //            | some_str is dead, and the borrow checker is mad
 8 | }                                               // -----------+
   | - borrowed value needs to live until here
 ```
 
-The code above illustrates why the borrow checker exists. I introduced a possible UaF and the borrow checker caught the bug at compile time. Fixing `main` such that 
+The code above illustrates why the borrow checker exists. I introduced a UaF and the borrow checker catches it at compile time. Fixing `main`, once `longest` had the necessary lifetime annotations, makes the program compile.
 
 ```rust
 fn main() {
@@ -355,7 +347,7 @@ By fixing `main` so that both of the parameters of `longest` have lifetimes over
 
 ## Structs with References
 
-Annotating lifetimes of references in structs are much easier to understand if you understand the cases in the previous section. The following example is probably as simple as it gets:
+I've found annotating lifetimes of references in structs much easier to understand after understanding the examples in the previous section. The following example is probably as simple as it gets:
 
 ```rust
 struct Coordinate {
@@ -363,7 +355,7 @@ struct Coordinate {
 }
 ```
 
-The borrow checker tells us right away we have a problem:
+The borrow checker tells me right away I have a problem:
 
 ```rust
 error[E0106]: missing lifetime specifier
@@ -373,7 +365,7 @@ error[E0106]: missing lifetime specifier
   |        ^ expected lifetime parameter
 ```
 
-This is because, as we saw earlier, if the borrowed value, `x` is dropped before the `Coordinate` struct uses it, then we have a UaF. Take the following concrete example:
+This is because, as we saw earlier, if the borrowed value, `x` is dropped before the `Coordinate` struct uses it, then I have a UaF. Take the following example:
 
 ```rust
 fn main() {
@@ -392,7 +384,7 @@ struct Coordinate {
 
 `main` creates a struct `Coordinate` and an internal scope that will, as we saw earlier, drop its local variable, `x`, at its closing brace `}`.
 
-Let's just do what the borrow checker says and add a lifetime annotation `'a` to the borrowed value.
+I'll just do what Rust's borrow checker says and add a lifetime annotation `'a` to the borrowed value in the `Coordinate` struct:
 
 ```rust
 fn main() {
@@ -409,7 +401,7 @@ struct Coordinate<'a> {
 }
 ```
 
-We run into a familiar issue during compilation:
+I run into a familiar issue during compilation:
 
 ```rust
 error[E0597]: `x` does not live long enough
@@ -424,7 +416,7 @@ error[E0597]: `x` does not live long enough
   | - borrowed value needs to live until here
 ```
 
-I introduced another UaF because `x` will be dropped and later printed. The fix is the same as in the previous section: fixing `main` so that both of the parameters of `longest` have lifetimes overlapping with their usage. The following compiles.
+I introduced another UaF because `x` will be dropped and later printed. As in the previous section, fixing `main` so that the borrow passed to `Coordinate` has a lifetime overlapping with its usage eliminates the UaF and the following compiles.
 
 ```rust
 fn main() {
@@ -440,4 +432,6 @@ struct Coordinate<'a> {
 
 ## Conclusion
 
-The borrow checker exists to validate memory integrity. 
+Rust's borrow checker exists to validate memory integrity. We add lifetime annotations to our programs so Rust's borrow checker can validate, at compile time, our programs do not contain use-after-free bugs.
+
+>**Some background...** Providing instructions, via lifetime annotations, to the compiler, confused me when I first encountered it. Coming from C# and rarely thinking about memory management (aside from disposing unmanaged resources), lifetimes were a [broadening](https://www.newyorker.com/magazine/1995/01/30/an-interval) experience for me. Thank you very much to [Kevin Lynagh](https://twitter.com/lynaghk), who I recently visited in Kraków, Poland, for his patience and guidance as I struggled to wrap my mind around lifetimes and for the gentle nudge to start writing.
