@@ -178,7 +178,7 @@ fn longest1(x: &str) -> &str {
 }
 ```
 
-Comparing the Klabnik and Nichols' `longest` to `longest1` the first thing that sticks out regarding lifetime annotations is that there are none; they have be _elided_ (i.e. omitted). Since there is only one input parameter, the borrow checker can infer which value the returned borrow refers to in order to check that value is still valid.
+Comparing Klabnik and Nichols' `longest` to `longest1` the first thing that sticks out regarding lifetime annotations is that there are none; they have be _elided_ (i.e. omitted). Since there is only one input parameter, the borrow checker can infer which value the returned borrow refers to in order to check the underlying value is still valid.
 
 Note: In the case above, lifetime annotations are optional. The following is equivalent to `longest1`.
 
@@ -226,7 +226,7 @@ fn longest5<'a>(x: &'a str, y: &i32) -> &'a str {
 }
 ```
 
-`longest5` uses a lifetime annotation, `'a`, to communicate to Rust's borrow checker that parameter `x` and the returned borrow have the same lifetime. The following example illustrates how the lifetime annotation helps Rust's borrow checker. (here, I borrow Klabnik and Nichols' helpful lifetime comment/illustrations).
+`longest5` uses a lifetime annotation, `'a`, to communicate to Rust's borrow checker that parameter `x` and the returned borrow must have the same lifetime in order to prevent UaF. The following example illustrates how the lifetime annotation helps Rust's borrow checker. (here, I borrow Klabnik and Nichols' helpful lifetime comment/illustrations).
 
 ```rust
 fn main() {
@@ -333,7 +333,7 @@ error[E0597]: `some_str` does not live long enough
   | - borrowed value needs to live until here
 ```
 
-The code above illustrates why the borrow checker exists. I introduced a UaF and the borrow checker catches it at compile time. Fixing `main`, once `longest` had the necessary lifetime annotations, makes the program compile.
+The code above illustrates why the borrow checker exists. I introduced a UaF and the borrow checker catches it at compile time. Fixing `main`, once `longest` has the necessary lifetime annotations, makes the program compile.
 
 ```rust
 fn main() {
@@ -365,7 +365,7 @@ error[E0106]: missing lifetime specifier
   |        ^ expected lifetime parameter
 ```
 
-This is because, as we saw earlier, if the borrowed value, `x` is dropped before the `Coordinate` struct uses it, then I have a UaF. Take the following example:
+This is because, as we saw earlier, if the borrowed value, `x`, is dropped before the `Coordinate` struct uses it, then I have a UaF. Take the following example:
 
 ```rust
 fn main() {
@@ -416,7 +416,7 @@ error[E0597]: `x` does not live long enough
   | - borrowed value needs to live until here
 ```
 
-I introduced another UaF because `x` will be dropped and later printed. As in the previous section, fixing `main` so that the borrow passed to `Coordinate` has a lifetime overlapping with its usage eliminates the UaF and the following compiles.
+I introduced another UaF: `x` will be dropped and later printed. As in the previous section, fixing `main` so that the borrow passed to `Coordinate` has a lifetime overlapping with its usage eliminates the UaF and the following compiles.
 
 ```rust
 fn main() {
@@ -432,6 +432,6 @@ struct Coordinate<'a> {
 
 ## Conclusion
 
-Rust's borrow checker exists to validate memory integrity. We add lifetime annotations to our programs so Rust's borrow checker can validate, at compile time, our programs do not contain use-after-free bugs.
+Rust's borrow checker exists to ensure memory integrity. We add lifetime annotations to our programs so Rust's borrow checker can validate, at compile time, our programs do not contain use-after-free bugs. Lifetimes give us the best of both worlds: no garbage collection "pause time" and memory integrity.
 
-> Providing instructions, via lifetime annotations, to the compiler, confused me when I first encountered it. Coming from C# and rarely thinking about memory management (aside from disposing unmanaged resources), lifetimes were a [broadening](https://www.newyorker.com/magazine/1995/01/30/an-interval) experience, to say the least. Thank you very much to [Kevin Lynagh](https://twitter.com/lynaghk), who I recently visited in Kraków, Poland, for his patience and guidance as I struggled with this and for the gentle nudge to start writing.
+> Providing instructions, via lifetime annotations, to the compiler, seriously confused me at first. Coming from C# and rarely thinking about memory management (aside from disposing unmanaged resources), lifetimes were a [broadening](https://www.newyorker.com/magazine/1995/01/30/an-interval) experience, to say the least. Thank you very much to [Kevin Lynagh](https://twitter.com/lynaghk), who I recently visited in Kraków, Poland, for his patience and guidance as I struggled and for the gentle nudge to start writing.
