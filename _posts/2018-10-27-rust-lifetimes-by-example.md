@@ -7,11 +7,13 @@ categories: rust
 
 ## Motivation
 
-I started learning Rust because I wanted to know more about this statically-typed, functional language that compiles to [WebAssembly](https://developer.mozilla.org/en-US/docs/WebAssembly) (I found Lin Clark's ["A Cartoon Intro to WebAssembly"](https://www.youtube.com/watch?v=HktWin_LPf4) very motivating). Coming from C# and not thinking about memory management much (other than [disposing unmanaged resources](https://docs.microsoft.com/en-us/dotnet/api/system.idisposable?view=netframework-4.7.2)), I also wanted to fill in some gaps there. 
+I started learning Rust because I wanted to know more about this statically-typed, functional language that compiles to [WebAssembly](https://developer.mozilla.org/en-US/docs/WebAssembly) (I found Lin Clark's ["A Cartoon Intro to WebAssembly"](https://www.youtube.com/watch?v=HktWin_LPf4) very motivating). Coming from C# and not thinking about memory management much (other than [disposing unmanaged resources](https://docs.microsoft.com/en-us/dotnet/api/system.idisposable?view=netframework-4.7.2)), I also wanted to fill in some gaps there.
 
-But even after reading ["The Rust Programming Language"](https://doc.rust-lang.org/book/) and blog posts like [this](https://theta.eu.org/2016/04/16/lyar-lifetimes.html) and [this](https://medium.com/@ericdreichert/how-i-think-about-rust-lifetimes-83a726aaa846), and writing [a feature-poor, far-from-perfect, version of Git](https://github.com/brntsllvn/mgit) in Rust, I _still_ felt uncomfortable working with lifetimes. Like, I had memorized when to add `'a` to certain things but did not really _get_ it.
+But even after reading ["The Rust Programming Language"](https://doc.rust-lang.org/book/) and blog posts like [this](https://theta.eu.org/2016/04/16/lyar-lifetimes.html) and [this](https://medium.com/@ericdreichert/how-i-think-about-rust-lifetimes-83a726aaa846), and writing [a feature-poor, far-from-perfect, version of Git](https://github.com/brntsllvn/mgit) in Rust, I _still_ felt uncomfortable working with lifetimes. I had memorized when to add `'a` to certain things but did not really _get_ it.
 
-So, if you are in the same boat - you have tried your darndest to grok lifetimes and are still like "uh, um, I just do this because it makes the borrow checker happy" - you might find the following article helpful. 
+I recently visted [Kevin Lynagh](https://twitter.com/lynaghk) in Kraków, Poland, and he suggested probing the lifetimes concept, like a physicist in a laboratory, stripping the idea down its essentials, with tiny, verifiable experiments. This approach seems obvious in hindsight, and I'm grateful for Kevin's extremely specific feedback and the nudge to start writing.  
+
+So, if you are in the same boat as I was - you have tried your darndest to grok lifetimes and are still like "uh, um, I just do this because it makes the borrow checker happy" - you might find this post helpful. 
 
 ## Introduction
 
@@ -67,11 +69,11 @@ To facilitate compile time checking, Rust developers tell the compiler how long 
 
 ## Rust's Borrow Checker
 
-Rust's _borrow checker_ is the part of the Rust compiler that identifies UaF and other common memory management bugs. In the case of functions, it examines the signature first, which I deduced by typing the following into my editor.
+Rust's _borrow checker_ is the part of the Rust compiler that identifies UaF and other common memory management bugs. In the case of functions, it examines the signature first, which I deduced by typing the following into my editor:
 
 ```rust
 fn f() -> &i32 {
-    // literally nothing
+    // nothing but this comment
 }
 ```
 
@@ -440,7 +442,3 @@ struct Coordinate<'a> {
 ## Conclusion
 
 Rust's borrow checker exists to ensure memory integrity. We add lifetime annotations to our programs so Rust's borrow checker can validate, at compile time, our programs do not contain use-after-free bugs. Lifetimes give us the best of both worlds: no garbage collection "pause time" and memory integrity.
-
-<sub>
-Learning about lifetimes was a broadening experience. Thank you very much to Kevin Lynagh, @lynaghk, (whom I recently visited in Kraków, Poland!) for his patience, guidance, constructive feedback and the nudge to start writing.
-</sub>
