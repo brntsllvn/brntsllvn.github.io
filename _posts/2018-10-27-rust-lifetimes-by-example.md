@@ -5,15 +5,19 @@ date:   2018-10-27 20:00:00 -0700
 categories: rust
 ---
 
+## Motivation
+
+I started learning Rust because I wanted to know more about this statically-typed, functional language that compiles to [WebAssembly](https://developer.mozilla.org/en-US/docs/WebAssembly) (I found Lin Clark's ["A Cartoon Intro to WebAssembly"](https://www.youtube.com/watch?v=HktWin_LPf4) very motivating). Coming from C# and not thinking about memory management much (other than [disposing unmanaged resources](https://docs.microsoft.com/en-us/dotnet/api/system.idisposable?view=netframework-4.7.2)), I also wanted to fill in some gaps there. 
+
+But even after reading ["The Rust Programming Language"](https://doc.rust-lang.org/book/) and blog posts like [this](https://theta.eu.org/2016/04/16/lyar-lifetimes.html) and [this](https://medium.com/@ericdreichert/how-i-think-about-rust-lifetimes-83a726aaa846), and writing [a feature-poor, far-from-perfect, version of Git](https://github.com/brntsllvn/mgit) in Rust, I _still_ felt uncomfortable working with lifetimes. Like, I had memorized when to add `'a` to certain things but did not really _get_ it.
+
+So, if you are in the same boat - you have tried your darndest to grok lifetimes and are still like "uh, um, I just do this because it makes the borrow checker happy" - you might find the following article helpful. 
+
 ## Introduction
 
-Rust is a statically-typed, functional language that compiles to WebAssembly and uses _lifetimes_, rather than garbage-collection, to manage memory.
+Garbage-collected languages like C# and Ruby constantly _mark and sweep_ objects on the heap <sup>[1](https://docs.microsoft.com/en-us/dotnet/standard/garbage-collection/fundamentals),[2](https://ruby-doc.org/core-2.2.0/GC.html)</sup>. Depending on the number of live objects, the program pays a performance cost, "pause time," <sup>[3](https://docs.microsoft.com/en-us/dotnet/standard/garbage-collection/fundamentals#concurrent-garbage-collection)</sup> as the garbage collector frees up memory.
 
-But why?
-
-Garbage-collected languages like C# and Ruby constantly _mark and sweep_ objects on the heap. Depending on the number of live objects, the program pays a performance cost, "pause time," as the garbage collector frees up memory.
-
-Without garbage collection, Rust is more like C, leaving memory management up to the developer. A common issue in C code is the "use after free" bug (UaF). The C program below tries to access memory after the program frees it. The result is a seg fault.
+Without garbage collection, Rust is more like C, leaving memory management up to the developer. A common issue in C code is the "use after free" bug (UaF). The C program below tries to access memory after the program frees it.
 
 ```c
 int main() {
@@ -22,11 +26,14 @@ int main() {
     free(str);
     printf("%s", str);
 }
-
+```
+Compiling and running:
+```console
 $ gcc -o ex ex.c
 $ ./ex
 Segmentation fault: 11
 ```
+I get a [segmentation fault](https://en.wikipedia.org/wiki/Segmentation_fault), which means I tried to access memory I am not supposed to (also, apparently, this is [only a problem beginners have](http://web.mit.edu/10.001/Web/Tips/tips_on_segmentation.html)...)
 
 Rust prevents UaF by statically analyzing code _at compile time_ and refusing to produce an executable until the developer corrects the bug. Looking at Rust code roughly equivalent to the C code above:
 
@@ -43,7 +50,7 @@ fn main() {
 
 Compiling, we get:
 
-```rust
+```console
 error[E0597]: `greet` does not live long enough
  --> src/main.rs:5:16
   |
@@ -60,7 +67,7 @@ To facilitate compile time checking, Rust developers tell the compiler how long 
 
 ## Rust's Borrow Checker
 
-Rust's _borrow checker_ is the part of the Rust compiler that identifies UaF and other common memory management bugs. In the case of functions, it examines the signature first.
+Rust's _borrow checker_ is the part of the Rust compiler that identifies UaF and other common memory management bugs. In the case of functions, it examines the signature first, which I deduced by typing the following into my editor.
 
 ```rust
 fn f() -> &i32 {
@@ -70,7 +77,7 @@ fn f() -> &i32 {
 
 The borrow checker provides the following feedback:
 
-```
+```console
 error[E0106]: missing lifetime specifier
  --> src/main.rs:1:11
   |
@@ -81,13 +88,13 @@ error[E0106]: missing lifetime specifier
   = help: consider giving it a 'static lifetime
 ```
 
-Each part of the error message is useful for understanding lifetimes:
+Each part of the error message was useful for me for understanding lifetimes:
 + This is an error: the Rust compiler will not produce an executable until I resolve the issue.
 + The Rust compiler "expected [a] lifetime parameter" and cannot infer the lifetime of the returned borrow.
 + The first "help" suggestion - "this function's return type contains a borrowed value, but there is no value for it to be borrowed from" - provides a solution: add a parameter which the returned value borrows from.
 + The second "help" suggestion - "consider giving it a `'static` lifetime" - provides another solution: return static data, (i.e. immutable data with known size at compile time), so that the binding is always valid.
 
-Let's try both solutions starting with adding the `'static` lifetime annotation.
+I am just gonna try both solutions starting with adding the `'static` lifetime annotation.
 
 ```rust
 fn f1() -> &'static i32 {
@@ -95,7 +102,7 @@ fn f1() -> &'static i32 {
 }
 ```
 
-After adding the `'static` lifetime annotation, the borrow checker moves past the function signature, so we add a minimal function body, `&1`, satisfying the signature, and the code compiles.
+After adding the `'static` lifetime annotation, the borrow checker moves past the function signature, so I add a minimal function body, `&1`, satisfying the signature, and the code compiles. Hooray.
 
 Note: string literals, like `"hello"`, and globals, like `77756`, live in the [data segment](https://en.wikipedia.org/wiki/Data_segment) of the resulting binary, separate from the heap. Rust only drops items on the heap and therefore literals and globals have a lifetime of the [whole program](https://doc.rust-lang.org/book/first-edition/lifetimes.html#static).
 
@@ -118,7 +125,7 @@ fn f3(x: &i32) -> &i32 {
 
 `f3` declares a variable, `y`, binds a value, and returns a borrow of that value. The key difference is that `y` goes out of scope when the function body closes introducing UaF and therefore `f3` does not compile:
 
-```rust
+```console
 error[E0597]: `y` does not live long enough
  --> src/main.rs:5:6
   |
@@ -128,11 +135,11 @@ error[E0597]: `y` does not live long enough
   | - borrowed value only lives until here
 ```
 
-Excluding static items, a function returning a borrow _must_ receive that borrow as a parameter since variables created in the function body will be dropped when the function body closes. This is important for understanding an example provided in "The Rust Programming Language" by Klabnik and Nichols, which I discuss in the next section.
+Excluding static items, a function returning a borrow _must_ receive that borrow as a parameter since variables created in the function body will be dropped when the function body closes. This is important for understanding an [example](https://doc.rust-lang.org/book/2018-edition/ch10-03-lifetime-syntax.html#generic-lifetimes-in-functions) in "The Rust Programming Language," which I discuss in the next section.
 
 ## Function Parameters
 
-Klabnik and Nichols provide the following example in the [2018 version of their book](https://doc.rust-lang.org/book/2018-edition/ch10-03-lifetime-syntax.html):
+Klabnik and Nichols provide the following example:
 
 ```rust
 fn longest(x: &str, y: &str) -> &str {
@@ -146,7 +153,7 @@ fn longest(x: &str, y: &str) -> &str {
 
 Rust's borrow checker errors with "expected lifetime parameter" as we saw earlier, but provides a new suggestion.
 
-```rust
+```console
 error[E0106]: missing lifetime specifier
  --> src/main.rs:3:33
   |
@@ -206,7 +213,7 @@ fn longest4(x: &str, y: &i32) -> &str {
 
 Compiling, we get:
 
-```rust
+```console
 error[E0106]: missing lifetime specifier
  --> src/main.rs:3:34
   |
@@ -286,7 +293,7 @@ fn longest7<'a>(x: &'a str, y: &str) -> &'a str {
 
 The difference between `longest7` and the original `longest` is that I have not included the lifetime annotation on the `y` parameter. Rust's borrow checker identifies that `longest7` could return `y` and throws a (surprisingly helpful) error:
 
-```rust
+```console
 error[E0621]: explicit lifetime required in the type of `y`
   --> src/main.rs:14:9
    |
@@ -320,7 +327,7 @@ fn longest<'a>(x: &'a str, y: &'a str) -> &'a str {
 
 When I compile the code above, I get the following:
 
-```rust
+```console
 error[E0597]: `some_str` does not live long enough
  --> src/main.rs:5:33
   |
@@ -357,7 +364,7 @@ struct Coordinate {
 
 The borrow checker tells me right away I have a problem:
 
-```rust
+```console
 error[E0106]: missing lifetime specifier
  --> src/main.rs:2:8
   |
@@ -403,7 +410,7 @@ struct Coordinate<'a> {
 
 I run into a familiar issue during compilation:
 
-```rust
+```console
 error[E0597]: `x` does not live long enough
  --> src/main.rs:5:34
   |
@@ -435,5 +442,5 @@ struct Coordinate<'a> {
 Rust's borrow checker exists to ensure memory integrity. We add lifetime annotations to our programs so Rust's borrow checker can validate, at compile time, our programs do not contain use-after-free bugs. Lifetimes give us the best of both worlds: no garbage collection "pause time" and memory integrity.
 
 <sub>
-Learning about lifetimes was a broadening experience. Thank you very much to Kevin Lynagh, @lynaghk, (whom I recently visited in Kraków, Poland!) for his patience and guidance and for the gentle nudge to start writing.
+Learning about lifetimes was a broadening experience. Thank you very much to Kevin Lynagh, @lynaghk, (whom I recently visited in Kraków, Poland!) for his patience, guidance, constructive feedback and the nudge to start writing.
 </sub>
