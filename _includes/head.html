@@ -5,6 +5,13 @@
   {%- seo -%}
   <link rel="stylesheet" href="{{ "/assets/main.css" | relative_url }}">
   <link rel="shortcut icon" type="image/png" href="/pup.png">
+  <style type="text/css">
+    body {
+      background:
+        linear-gradient(rgba(255,224,99,0.25), rgba(255,224,99,0.25)),
+        url("/geometry.png");
+    }
+  </style>
   {%- feed_meta -%}
   {%- if jekyll.environment == 'production' and site.google_analytics -%}
     {%- include google-analytics.html -%}
