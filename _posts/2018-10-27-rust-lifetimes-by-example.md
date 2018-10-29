@@ -435,5 +435,5 @@ struct Coordinate<'a> {
 Rust's borrow checker exists to ensure memory integrity. We add lifetime annotations to our programs so Rust's borrow checker can validate, at compile time, our programs do not contain use-after-free bugs. Lifetimes give us the best of both worlds: no garbage collection "pause time" and memory integrity.
 
 <sub>
-Providing instructions to the compiler via lifetime annotations seriously confused me at first. Having written mostly C# and rarely thinking about memory management (aside from disposing unmanaged resources), learning about lifetimes was broadening, to say the least. Thank you very much to Kevin Lynagh, @lynaghk, (whom I recently visited in Kraków, Poland!) for his patience and guidance and for the gentle nudge to start writing.
+Learning about lifetimes was a broadening experience. Thank you very much to Kevin Lynagh, @lynaghk, (whom I recently visited in Kraków, Poland!) for his patience and guidance and for the gentle nudge to start writing.
 </sub>
