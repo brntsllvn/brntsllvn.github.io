@@ -11,7 +11,7 @@ I started learning Rust because I wanted to know more about this statically-type
 
 But even after reading ["The Rust Programming Language"](https://doc.rust-lang.org/book/) and blog posts like [this](https://theta.eu.org/2016/04/16/lyar-lifetimes.html) and [this](https://medium.com/@ericdreichert/how-i-think-about-rust-lifetimes-83a726aaa846), and writing [a feature-poor, far-from-perfect, version of Git](https://github.com/brntsllvn/mgit) in Rust, I _still_ felt uncomfortable working with lifetimes. I had memorized when to add `'a` to certain things but did not really _get_ it.
 
-I recently visted [Kevin Lynagh](https://twitter.com/lynaghk) in Kraków, Poland, and he suggested probing the lifetimes concept, like a physicist in a laboratory, stripping the idea down its essentials, with tiny, verifiable experiments. This approach seems obvious in hindsight, and I'm grateful for Kevin's extremely specific feedback and the nudge to start writing.  
+I recently visted [Kevin Lynagh](https://kevinlynagh.com) ([@lynaghk](https://twitter.com/lynaghk)) in Kraków, Poland, and he suggested probing the lifetimes concept, like a physicist in a laboratory, stripping the idea down its essentials, with tiny, verifiable experiments. This approach seems obvious in hindsight, and I'm grateful for Kevin's extremely specific feedback and the nudge to start writing.  
 
 So, if you are in the same boat as I was - you have tried your darndest to grok lifetimes and are still like "uh, um, I just do this because it makes the borrow checker happy" - you might find this post helpful. 
 
