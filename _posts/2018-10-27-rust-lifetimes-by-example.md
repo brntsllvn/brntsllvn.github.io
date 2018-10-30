@@ -11,7 +11,7 @@ I started learning Rust because I wanted to know more about this statically-type
 
 But even after reading ["The Rust Programming Language"](https://doc.rust-lang.org/book/) and blog posts like [this](https://theta.eu.org/2016/04/16/lyar-lifetimes.html) and [this](https://medium.com/@ericdreichert/how-i-think-about-rust-lifetimes-83a726aaa846), and writing [a feature-poor, far-from-perfect, version of Git](https://github.com/brntsllvn/mgit) in Rust, I _still_ felt uncomfortable working with lifetimes. I had memorized when to add `'a` to certain things but did not really _get_ it.
 
-I recently visted [Kevin Lynagh](https://kevinlynagh.com) ([@lynaghk](https://twitter.com/lynaghk)) in Kraków, Poland, and he suggested probing the lifetimes concept, like a physicist in a laboratory, stripping the idea down its essentials, with tiny, verifiable experiments. This approach seems obvious in hindsight, and I'm grateful for Kevin's extremely specific feedback and the nudge to start writing.  
+I recently visted [Kevin Lynagh](https://kevinlynagh.com) ([@lynaghk](https://twitter.com/lynaghk)) in Kraków, Poland, and he suggested probing the lifetimes concept, like a physicist in a laboratory, stripping the idea down its essentials, with tiny, verifiable experiments. This approach seems obvious in hindsight and yielded excellent results. I am grateful for Kevin's extremely specific feedback and the nudge to start writing.  
 
 So, if you are in the same boat as I was - you have tried your darndest to grok lifetimes and are still like "uh, um, I just do this because it makes the borrow checker happy" - you might find this post helpful. 
 
@@ -137,7 +137,7 @@ error[E0597]: `y` does not live long enough
   | - borrowed value only lives until here
 ```
 
-Excluding static items, a function returning a borrow _must_ receive that borrow as a parameter since variables created in the function body will be dropped when the function body closes. This is important for understanding an [example](https://doc.rust-lang.org/book/2018-edition/ch10-03-lifetime-syntax.html#generic-lifetimes-in-functions) in "The Rust Programming Language," which I discuss in the next section.
+Excluding static items, a function returning a borrow _must_ receive that borrow as a parameter since variables created in the function body will be dropped when the function body closes. This is important for understanding an [example](https://doc.rust-lang.org/book/second-edition/ch10-03-lifetime-syntax.html) in "The Rust Programming Language," which I work through in the next section.
 
 ## Function Parameters
 
@@ -442,3 +442,5 @@ struct Coordinate<'a> {
 ## Conclusion
 
 Rust's borrow checker exists to ensure memory integrity. We add lifetime annotations to our programs so Rust's borrow checker can validate, at compile time, our programs do not contain use-after-free bugs. Lifetimes give us the best of both worlds: no garbage collection "pause time" and memory integrity.
+
+Finally, I am extremely grateful for ["the Rust Programming Language"](https://smile.amazon.com/Rust-Programming-Language-Steve-Klabnik-ebook/dp/B071YKRV8Q/ref=sr_1_1?ie=UTF8&qid=1540925375&sr=8-1&keywords=the+rust+programming+language) book by Steve Klabnik and Carol Nichols. Please support Steve's [charity of choice](https://twitter.com/steveklabnik/status/1047989132297998342), [Black Girls Code](http://www.blackgirlscode.com), by buying the book or donating directly [here](http://www.blackgirlscode.com/donations.html).  
