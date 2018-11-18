@@ -1,6 +1,6 @@
 ---
 layout: post
-title:  "Java's final Keyword by Example"
+title:  "Java Final Keyword by Example"
 date:   2018-11-16 21:00:00 -0700
 
 categories: java

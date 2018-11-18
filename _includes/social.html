@@ -1,6 +1,14 @@
-<ul class="social-media-list">
-  {%- if site.github_username -%}<li><a target="_blank" href="https://github.com/{{ site.github_username| cgi_escape | escape }}"><svg class="svg-icon"><use xlink:href="{{ '/assets/minima-social-icons.svg#github' | relative_url }}"></use></svg> <span class="username">{{ site.github_username| escape }}</span></a></li>{%- endif -%}
-  {%- if site.twitter_username -%}<li><a target="_blank" href="https://www.twitter.com/{{ site.twitter_username| cgi_escape | escape }}"><svg class="svg-icon"><use xlink:href="{{ '/assets/minima-social-icons.svg#twitter' | relative_url }}"></use></svg> <span class="username">{{ site.twitter_username| escape }}</span></a></li>{%- endif -%}
-  {%- if site.email -%}<li><a class="u-email" target="_blank" href="mailto:{{ site.email }}">{{ site.email }}</a></li>{%- endif -%}
-  <!--<li><a href="{{ "/feed.xml" | relative_url }}">subscribe via RSS</a></li>-->
-</ul>
+<a target="_blank" href="https://github.com/{{ site.github_username| cgi_escape | escape }}">
+    <img src="/img/git.png" alt="github link" height="35" width="35">
+</a>
+
+<a target="_blank" href="https://www.twitter.com/{{ site.twitter_username| cgi_escape | escape }}">
+    <img src="/img/twitter.png" alt="twitter link" height="50" width="50">
+</a>
+
+<a class="u-email" target="_blank" href="mailto:{{ site.email }}">
+    <img src="/img/email.png" alt="email me" height="35" width="35">
+</a>
+
+
+
