@@ -9,137 +9,265 @@ categories: java
 
 IDEs make it easy to fudge knowledge about the classpath. Oftentimes I create a new project, IntelliJ does some stuff and then I click a little green triangle and my program runs. That feels...unsatisfactory, so today (tonight really), I'm digging into the classpath.
 
-Really quick: this post is not about the `CLASSPATH` environment variable. The official docs suggest not using it (interestingly, Kevin Boone suggests using it when including entries in addition to the default system classpath <sup>[Boone](http://kevinboone.net/classpath.html)</sup>), but it's not my focus here.
+## javac
 
-Finally: I'm leaning heavily on material presented by others. I recommend reading their stuff and will link to it throughout this post. I'll try some novel stuff, but I'm mostly summarizing their work for my benefit.
-
-## Class Search Path
-
-The "classpath" is short for the "class search path," which gives some indication of what it does: it tells the JDK tool you're using (e.g. `java` or `javac`) where to find classes and resource files. I'll follow along with [Kevin Boone's example](http://kevinboone.net/classpath.html) and experiment a bit.
-
-Suppose I have some classes in a structure like this:
+Taking the simplest-possible example, suppose I have the following:
 
 ```console
 .
-└── com
-    └── brent
-        ├── Pizza.java
-        └── TomatoSauce.java
+└── Pizza.java
 ```
-
 ```java
-package com.brent;
-public class TomatoSauce {
-    public static void main(String[] args) {
-        // noop
-    }
-}
-
-package com.brent;
-public class Pizza {
-    public static void main(String[] args) {
-        TomatoSauce tomatoSauce = new TomatoSauce();
-    }
-}
-```
-I'll do as Boone suggests and clear the classpath to see what happens before I add anything to it. Trying to compile from the current directory (see little tree diagram above) does not work:
-
-```console
-$ javac -classpath ""
-javac: no source files
+// Pizza.java
+public class Pizza {}
 ```
 
-Descending a directory might help...:
+Compiling works as expected and produces Pizza.class:
 
 ```console
+$ javac Pizza.java
 .
-└── brent
-    ├── Pizza.java
-    └── TomatoSauce.java
-
-$ javac -classpath ""
-javac: no source files
+├── Pizza.class
+└── Pizza.java
 ```
 
-Nope. Descending again...:
-
-```console
-.
-├── Pizza.java
-└── TomatoSauce.java
-
-$ javac -classpath ""
-javac: no source files
-```
-
-No luck. But that's as far down the tree as we can go. So I have to try something else. What about specifying a file directly (still without touching the classpath)?
-
-```console
-.
-├── Pizza.java
-└── TomatoSauce.java
-
-$ javac -classpath "" TomatoSauce.java 
-```
-
-This works. Clearing the `.class` file first, what happens when I try to compile `Pizza`?
+But this doesn't tell us much, so I'll remove the `.class` file add the extremely-elucidating `-verbose` flag:
 
 ```console
 $ rm *.class
-$ javac -classpath "" Pizza.java 
-Pizza.java:5: error: cannot find symbol
-        TomatoSauce tomatoSauce = new TomatoSauce();
-        ^
-  symbol:   class TomatoSauce
-  location: class Pizza
+$ javac -verbose Pizza.java
+```
+```console
+[parsing started RegularFileObject[Pizza.java]]
+[parsing completed 29ms]
+[search path for source files: .]
+[search path for class files: /Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/resources.jar,/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/rt.jar,/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/sunrsasign.jar,/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/jsse.jar,/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/jce.jar,/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/charsets.jar,/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/jfr.jar,/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/classes,/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/ext/sunec.jar,/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/ext/nashorn.jar,/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/ext/cldrdata.jar,/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/ext/jfxrt.jar,/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/ext/dnsns.jar,/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/ext/localedata.jar,/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/ext/sunjce_provider.jar,/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/ext/sunpkcs11.jar,/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/ext/jaccess.jar,/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/ext/zipfs.jar,/System/Library/Java/Extensions/MRJToolkit.jar,.]
+[loading ZipFileIndexFileObject[/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/lib/ct.sym(META-INF/sym/rt.jar/java/lang/Object.class)]]
+[checking Pizza]
+[loading ZipFileIndexFileObject[/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/lib/ct.sym(META-INF/sym/rt.jar/java/io/Serializable.class)]]
+[loading ZipFileIndexFileObject[/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/lib/ct.sym(META-INF/sym/rt.jar/java/lang/AutoCloseable.class)]]
+[wrote RegularFileObject[Pizza.class]]
+[total 324ms]
 ```
 
-Compilation fails because `Pizza` cannot find `TomatoSauce` even though they are in the same package. 
-
-Boone suggests we try adding the current directory `.` to the classpath:
+This is still a bit complicated, so I'll zero everything out to clean up the output:
 
 ```console
-$ javac -classpath "." Pizza.java 
-Pizza.java:5: error: cannot find symbol
-        TomatoSauce tomatoSauce = new TomatoSauce();
-        ^
-  symbol:   class TomatoSauce
-  location: class Pizza
+$ rm *.class
+$ javac -verbose -extdirs "" -bootclasspath "" Pizza.java
+[parsing started RegularFileObject[Pizza.java]]
+[parsing completed 30ms]
+[search path for source files: .]
+[search path for class files: .]
+Fatal Error: Unable to find package java.lang in classpath or bootclasspath
 ```
 
-But we get the same error, because, as he describes it, we are telling the compiler to "_begin a class search_ from the current directory" (emphasis his) rather than telling the compiler to include everything from the current directory. To fix the issue, we need to _start_ the search from the proper altitude:
+That's a lot cleaner, but I went too far. `Unable to find package java.lang` tells me I have to include the `jar` that contains `java.lang`. No problem!
 
 ```console
-$ javac -classpath "../.." Pizza.java
+$ javac -verbose -extdirs "" -bootclasspath "/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/rt.jar" Pizza.java
+[parsing started RegularFileObject[Pizza.java]]
+[parsing completed 30ms]
+[search path for source files: .]
+[search path for class files: /Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/rt.jar,.]
+[loading ZipFileIndexFileObject[/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/rt.jar(java/lang/Object.class)]]
+[checking Pizza]
+[loading ZipFileIndexFileObject[/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/rt.jar(java/io/Serializable.class)]]
+[loading ZipFileIndexFileObject[/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/rt.jar(java/lang/AutoCloseable.class)]]
+[wrote RegularFileObject[Pizza.class]]
+[total 403ms]
 ```
 
-This works. And, of course, so does the following (analogous) code:
+How did I know to add `/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/rt.jar` to the `-bootclasspath`? This is worth a tiny digression.
+
+## A Tiny Digression
+
+When I first ran `javac` with the `-verbose` option, I got a lot of output. In particular, I noticed the following message:
+```console
+[loading ZipFileIndexFileObject[/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/lib/----> rt.jar <----/java/lang/Object.class)]]
+```
+(I added the little arrows to make it obvious `rt.jar` is loaded by the classloader) 
+
+You can confirm `java/lang/Object.class` lives in `rt.jar` by inspecting the contents:
+ ```console
+ $ jar tz /Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/rt.jar
+ ...
+ java/lang/Object.class
+ ...
+ ```
+ 
+ Straight outta the docs: "rt.jar -- the bootstrap classes (the RunTime classes that comprise the Java platform's core API)." <sup>[JDK and JRE File Structure](https://docs.oracle.com/javase/7/docs/technotes/tools/solaris/jdkfiles.html)</sup>
+ 
+It turns out I can also add `rt.jar` to the `-classpath` and get the same result, which I stumbled on while experimenting with this stuff.
+
+What really matters here is that I don't need all the other jars on the `-bootclasspath`.
+
+Why not put `rt.jar` on `-extdirs`? `-extdirs` corresponds the extensions classloader, which looks for classes in the `.ext` package, of which `rt.jar` does not belong.
+
+Nested digression: the compiler uses three class loaders (in this order): 1) Bootstrap, 2) Extension and 3) System. You can read more about the class loading hierarchy in [this excellent blog post](https://blog.cdap.io/2015/08/java-class-loading-and-distributed-data-processing-frameworks/), but they're not the focus here.
+
+The takeaway from this whole digression is that the following command is my home base and I'll use it for the rest of this post to _finally_ talk about `-classpath`.
 
 ```console
-$ cd ..
+javac -verbose -extdirs "" -bootclasspath "/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/rt.jar" Pizza.java
+```
+
+## Back to javac
+
+I want to make this a little more realistic, so I'll add a dependency to `Pizza.java`:
+
+```java
+// Pizza.java
+public class Pizza {
+    Sauce sauce = new Sauce();
+}
+
+// Sauce.java
+public class Sauce {}
+```
+
+Compiling, using my lengthy (but hopefully very clear) command:
+
+```console
+$ javac -verbose -extdirs "" -bootclasspath "/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/rt.jar" Pizza.java
+[parsing started RegularFileObject[Pizza.java]]
+[parsing completed 28ms]
+[search path for source files: .]
+[search path for class files: /Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/rt.jar,.]
+[loading ZipFileIndexFileObject[/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/rt.jar(java/lang/Object.class)]]
+[loading RegularFileObject[./Sauce.java]]
+[parsing started RegularFileObject[./Sauce.java]]
+[parsing completed 1ms]
+[checking Pizza]
+[loading ZipFileIndexFileObject[/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/rt.jar(java/io/Serializable.class)]]
+[loading ZipFileIndexFileObject[/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/rt.jar(java/lang/AutoCloseable.class)]]
+[wrote RegularFileObject[Pizza.class]]
+[checking Sauce]
+[wrote RegularFileObject[./Sauce.class]]
+[total 399ms]
+```
+
+`-verbose` is really amazing. It tells me `Pizza.java` is my focus because that's where the parsing starts, then it briefly mentions the classpath (albeit cryptically) `[search path for source files: .]` and then writes `Pizza.class` and `Sauce.class`. That's excellent but I still have not touched the `-classpath` yet...at all. So I will continue making my example more interesting.
+
+## Packages
+
+Suppose I put my classes in packages now. That's what everyone does, right? And it's supposed to make the `-classpath`, hard, right? See [this blog post](https://www.antwerkz.com/?author=4ea18300d09aa9e3f3298e5e) if you want to be called a "beginner" 4 times (this flavor of condescension is one of my pet-peaves...).
+
+Anyway, take a gander at the following same classes, now in a package:
+
+```console
 .
-└── brent
-    ├── Pizza.java
-    └── TomatoSauce.java
-$ javac -classpath ".." brent/Pizza.java
-```
-
-The crucial thing is where the search _begins_. 
-
-According to the (very confusingly-worded) [How Classes are Found](https://docs.oracle.com/javase/7/docs/technotes/tools/findingclasses.html) official docs, there's a close relationship between a directory and a package (Boone calls it a "fundamental rule"). 
-
-Taking the above example to its logical limit, we get the familiar "default value" classpath: 
-
-```console
-$ cd ..
-.
-└── com
-    └── brent
+└── food
+    └── machine
         ├── Pizza.java
-        └── TomatoSauce.java
-$ javac -classpath "." com/brent/Pizza.java
+        └── Sauce.java
+```
+```java
+package food.machine;
+public class Sauce {}
+
+package food.machine;
+public class Pizza {
+    Sauce sauce = new Sauce();
+}
 ```
 
-This compiles just fine and hopefully motivates that the class search path must begin at the root.
+Compiling, we get an error:
+
+```console
+$ javac -verbose -extdirs "" -bootclasspath "/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/rt.jar" Pizza.java
+javac: file not found: Pizza.java
+```
+
+This makes sense. `Pizza.java` is now in a package (and corresponding nested directory) called `food.machine` so I have to refer to it relatively:
+
+```console
+$ javac -verbose -extdirs "" -bootclasspath "/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/rt.jar" food/machine/Pizza.java
+[parsing started RegularFileObject[food/machine/Pizza.java]]
+[parsing completed 30ms]
+[search path for source files: .]
+...
+```
+
+This works just fine. `-classpath` defaults to the current directory, `.`, so I make my source file relative to `.`, no problem.
+
+## out
+
+I haven't even touched `-classpath` yet, but hopefully with the motivation above, the following stuff seems easier than just dropping you in at this point.
+
+Usually folks tell the compiler to deposit their `.class` files in a different directory. We can do this by adding the `-d` option to the compiler command:
+
+```console
+$ mkdir out
+.
+├── food
+│   └── machine
+│       ├── Pizza.java
+│       └── Sauce.java
+└── out
+
+$ javac -verbose -d out -extdirs "" -bootclasspath "/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/rt.jar" food/machine/Pizza.java
+[parsing started RegularFileObject[food/machine/Pizza.java]]
+...
+[search path for source files: .]
+...
+[loading RegularFileObject[./food/machine/Sauce.java]]
+[parsing started RegularFileObject[./food/machine/Sauce.java]]
+...
+[wrote RegularFileObject[out/food/machine/Sauce.class]]
+...
+  
+.
+├── food
+│   └── machine
+│       ├── Pizza.java
+│       └── Sauce.java
+└── out
+    └── food
+        └── machine
+            ├── Pizza.class
+            └── Sauce.class
+```
+
+So, above, I add `-d out` to my compiler command and the compiler helpfully places my `.class` files in my new `out` directory with a directory structure that matches my sources. I could continue compiling in this way, but it's inefficient. 
+
+`Pizza` depends on `Sauce` but if I make a change to `Pizza` only, I don't need to re-compile `Sauce`. To take advantage of this, I will use the `-classpath` option:
+
+```java
+package food.machine;
+public class Pizza {
+    Sauce sauce = new Sauce();
+    // some change
+}
+```
+
+Compiling again, but this time taking advantage of the `-classpath` option, I get:
+
+```console
+$ javac -verbose -d out -classpath out -extdirs "" -bootclasspath "/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/rt.jar" food/machine/Pizza.java
+[parsing started RegularFileObject[food/machine/Pizza.java]]
+...
+[search path for source files: out]
+...
+[loading RegularFileObject[out/food/machine/Sauce.class]]
+...
+```
+
+The first thing to notice is that `out` is in the class search path (`[search path for source files: out]`). So the compiler will try to get `.class` files from that location before compiling from sources. 
+
+The next interesting thing to notice is that when I use the `-classpath` option, I only load `Sauce.class`, rather than previously loading `Sauce.java`, then parsing it, then writing `Sauce.class`. This is a much trimmer operation and although the example here is small, you can image the compile-time savings adding up if a project contains hundreds or thousands of classes. 
+
+## lib
+
+
+
+
+
+
+
+[Kevin Boone](http://kevinboone.net/classpath.html)
+[How Classes are Found](https://docs.oracle.com/javase/7/docs/technotes/tools/findingclasses.html)
+
+## 
 
 ## Conclusion
