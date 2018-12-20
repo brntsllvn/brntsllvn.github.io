@@ -255,19 +255,84 @@ $ javac -verbose -d out -classpath out -extdirs "" -bootclasspath "/Library/Java
 
 The first thing to notice is that `out` is in the class search path (`[search path for source files: out]`). So the compiler will try to get `.class` files from that location before compiling from sources. 
 
-The next interesting thing to notice is that when I use the `-classpath` option, I only load `Sauce.class`, rather than previously loading `Sauce.java`, then parsing it, then writing `Sauce.class`. This is a much trimmer operation and although the example here is small, you can image the compile-time savings adding up if a project contains hundreds or thousands of classes. 
+The next interesting thing to notice is that when I use the `-classpath` option, I only load `Sauce.class`, rather than previously loading `Sauce.java`, then parsing it, then writing `Sauce.class`. This is a much trimmer operation and although the example here is small, you can image the compile-time savings adding up if a project contains hundreds or thousands of classes that need to be compiled but have not changed. 
 
 ## lib
 
+Upping the stakes a bit, suppose I introduce a dependency whose `.class` files live in a jar (I've already done this with `rt.jar` but it's worth doing an example).
+
+To do so, I add a `lib` directory to my project, download `guava-27.0.1-jre.jar` and place the jar there. When that's done, my file structure looks like this:
+
+```console
+.
+├── food
+│   └── machine
+│       ├── Pizza.java
+│       └── Sauce.java
+├── lib
+│   └── guava-27.0.1-jre.jar
+└── out
+    └── food
+        └── machine
+            ├── Pizza.class
+            └── Sauce.class
+```  
+
+Now I'll make a tiny change to `Pizza.java`:
+
+```java
+package food.machine;
+public class Pizza {
+    Sauce sauce = new Sauce();
+    Boolean isPrime = com.google.common.math.IntMath.isPrime(3);
+}
+```
+
+Compiling:
+```java
+$ javac -verbose -d out -classpath out -extdirs "" -bootclasspath "/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/rt.jar" food/machine/Pizza.java
+[parsing started RegularFileObject[food/machine/Pizza.java]]
+...
+[search path for source files: out]
+...
+food/machine/Pizza.java:4: error: package com.google.common.math does not exist
+    Boolean isPrime = com.google.common.math.IntMath.isPrime(3);
+                                            ^
+```
+
+The compiler cannot find `guava-27.0.1-jre.jar` because it is not on the class search path, which, from the output above `[search path for source files: out]`, only contains `out`. This is an easy fix, I just add the jar to the class search path after a colon `:` and compile again:
+
+```java
+$ javac -verbose -d out -classpath out:lib/guava-27.0.1-jre.jar -extdirs "" -bootclasspath "/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/rt.jar" food/machine/Pizza.java
+[parsing started RegularFileObject[food/machine/Pizza.java]]
+...
+[search path for source files: out,lib/guava-27.0.1-jre.jar]
+...
+[loading ZipFileIndexFileObject[lib/guava-27.0.1-jre.jar(com/google/common/math/IntMath.class)]]
+[loading ZipFileIndexFileObject[lib/guava-27.0.1-jre.jar(com/google/common/annotations/GwtCompatible.class)]]
+...
+[wrote RegularFileObject[out/food/machine/Pizza.class]]
+...
+```
+
+NOTE: I can't just drop in the jar, I need to provide its path too. 
 
 
-
-
-
-
-[Kevin Boone](http://kevinboone.net/classpath.html)
-[How Classes are Found](https://docs.oracle.com/javase/7/docs/technotes/tools/findingclasses.html)
-
-## 
 
 ## Conclusion
+
+I spent a ton of time understanding the class search path. Stumbling on the `-verbose` flag yielded enormous benefits. I read blogs and the docs (see my sources below) but the _point_ of the classpath and bending it to my will wasn't clicking until I stripped everything away and started experimenting. This is a slow process but I'm glad I went through it and hopefully I've saved you some time with the presentation above.
+
+## Sources
+
+Blogs
+
++ [Kevin Boone: Mastering the Java CLASSPATH](http://kevinboone.net/classpath.html)
++ [Terence Yim: Java Class Loading and Distributed Data Processing Frameworks](https://blog.cdap.io/2015/08/java-class-loading-and-distributed-data-processing-frameworks/)
++ [Justin Lee: The Classpath](https://www.antwerkz.com/?author=4ea18300d09aa9e3f3298e5e)
+
+Official
++ [Setting the Class Path](https://docs.oracle.com/javase/8/docs/technotes/tools/windows/classpath.html)
++ [How Classes are Found](https://docs.oracle.com/javase/7/docs/technotes/tools/findingclasses.html)
++ [JDK and JRE File Structure](https://docs.oracle.com/javase/7/docs/technotes/tools/solaris/jdkfiles.html)
++ [javac - Java programming language compiler](https://docs.oracle.com/javase/7/docs/technotes/tools/windows/javac.html)
