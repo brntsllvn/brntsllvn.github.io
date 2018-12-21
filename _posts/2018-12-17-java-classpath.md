@@ -1,13 +1,17 @@
 ---
 layout: post
-title:  "The classpath"
+title:  "The class path, class search path, classpath thing...and you"
 date:   2018-12-17 21:00:00 -0700
 categories: java
 ---
 
 ## Motivation
 
-IDEs make it easy to fudge knowledge about the classpath. Oftentimes I create a new project, IntelliJ does some stuff and then I click a little green triangle and my program runs. That feels...unsatisfactory, so today (tonight really), I'm digging into the classpath.
+This post is about the class path (short for the "class search path" <sup>[docs](https://docs.oracle.com/javase/8/docs/technotes/tools/windows/classpath.html)</sup> and also un-officially one-worded as "classpath" <sup>[Boone](http://kevinboone.net/classpath.html)</sup> and maybe more precisely referred-to as the `-classpath` option), "the path that the Java Runtime Environment (JRE) searches for classes and other resource files."
+
+IDEs make it easy to forget about the classpath . Oftentimes I create a new project, my IDE does some stuff, then I click a little green triangle and my program compiles or runs or whatever. Today I'm pulling back the curtain and breaking down the `-classpath` option from the beginning.
+
+
 
 ## javac
 
@@ -16,13 +20,12 @@ Taking the simplest-possible example, suppose I have the following:
 ```console
 .
 └── Pizza.java
-```
-```java
+
 // Pizza.java
 public class Pizza {}
 ```
 
-Compiling works as expected and produces Pizza.class:
+Compiling is straightforward and produces Pizza.class:
 
 ```console
 $ javac Pizza.java
@@ -31,10 +34,13 @@ $ javac Pizza.java
 └── Pizza.java
 ```
 
-But this doesn't tell me much, so I'll remove the `.class` file add the extremely elucidating `-verbose` flag:
+But this does not tell me much, so I'll start from scratch by removing the `.class` file, and add the extremely elucidating `-verbose` flag:
 
 ```console
 $ rm *.class
+.
+└── Pizza.java
+
 $ javac -verbose Pizza.java
 ```
 ```console
@@ -50,11 +56,17 @@ $ javac -verbose Pizza.java
 [total 324ms]
 ```
 
-This output is still too complicated, so I'll zero everything out to clean up the output:
+Adding the `-verbose` option outputs "messages about what the compiler is doing." But the output is dense and I would like to clean it up, so I'll zero everything. Note: from here on out, I'm splitting the command over several lines, one option per line, to make it easier to read. 
 
 ```console
-$ rm *.class
-$ javac -verbose -extdirs "" -bootclasspath "" Pizza.java
+$ javac \
+  -verbose \
+  -classpath "" \
+  -extdirs "" \
+  -bootclasspath "" \
+  Pizza.java
+```
+```
 [parsing started RegularFileObject[Pizza.java]]
 [parsing completed 30ms]
 [search path for source files: .]
@@ -62,10 +74,19 @@ $ javac -verbose -extdirs "" -bootclasspath "" Pizza.java
 Fatal Error: Unable to find package java.lang in classpath or bootclasspath
 ```
 
-This is a lot cleaner, but I went too far. `Unable to find package java.lang` tells me I have to include the `jar` that contains `java.lang`:
+Setting each of these options, `-classpath`, `-extdirs` and `-bootclasspath` to `""` sets them to their defaults, the current directory `.`. And for anyone who is curious, `[search path for source files: .]` maps to the `-classpath` option and `[search path for class files: .]` maps to the `-extdirs` and `-bootclasspath` options.
+
+This is a lot cleaner, but I went too far. The error message above, `Unable to find package java.lang`, tells me I have to include the `jar` that contains `java.lang` somewhere in my command:
 
 ```console
-$ javac -verbose -extdirs "" -bootclasspath "/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/rt.jar" Pizza.java
+$ javac \
+  -verbose \
+  -classpath "" \
+  -extdirs "" \
+  -bootclasspath "/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/rt.jar" \
+  Pizza.java
+```
+```
 [parsing started RegularFileObject[Pizza.java]]
 [parsing completed 30ms]
 [search path for source files: .]
@@ -78,41 +99,30 @@ $ javac -verbose -extdirs "" -bootclasspath "/Library/Java/JavaVirtualMachines/j
 [total 403ms]
 ```
 
-How did I know to add `/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/rt.jar` to the `-bootclasspath`? This is worth a tiny digression.
+Compilation successfully completes (i.e. Pizza.class is created), but how did I know to add `/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/rt.jar` to the `-bootclasspath`? Well, the error reads "Unable to find package java.lang in classpath or bootclasspath" so that tells me _where_ I need to put the jar containing the package `java.lang` but not _which_ jar actually contains `java.lang`. 
 
-## A Tiny Digression
-
-When I first ran `javac` with the `-verbose` option, I got a lot of output. In particular, I noticed the following message:
-```console
-[loading ZipFileIndexFileObject[/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/lib/----> rt.jar <----/java/lang/Object.class)]]
-```
-(I added the little arrows to make it obvious `rt.jar` is loaded by some classloader) 
-
-You can confirm `java/lang/Object.class` lives in `rt.jar` by inspecting the contents:
- ```console
- $ jar tz /Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/rt.jar
- ...
- java/lang/Object.class
- ...
- ```
- 
- Straight outta the docs: "rt.jar -- the bootstrap classes (the RunTime classes that comprise the Java platform's core API)." <sup>[JDK and JRE File Structure](https://docs.oracle.com/javase/7/docs/technotes/tools/solaris/jdkfiles.html)</sup>
- 
-Side note: it turns out I can also add `.../rt.jar` to the `-classpath` and get the same result.
-
-What really matters here is that I don't need all the other jars on the `-bootclasspath`.
-
-Can I put `rt.jar` on `-extdirs`? `-extdirs` corresponds the extensions classloader, which looks for classes in the `.ext` package. `rt.jar` does not have any classes in the `.ext` package, so the extensions classloader will not load anything from `rt.jar` (i.e. this doesn't work).
-
-Nested digression: the compiler uses three classloaders (in this order): 1) Bootstrap, 2) Extension and 3) System. You can read more about the class loading hierarchy in [this excellent blog post](https://blog.cdap.io/2015/08/java-class-loading-and-distributed-data-processing-frameworks/), but they're not the focus here.
-
-The takeaway from this whole digression is that the following command is my home base because it reamoves all unnecessary information and I'll use it for the rest of this post to _finally_ talk about `-classpath`.
+Looking at, say, this line from the original `javac -verbose Pizza.java` command, gives me the answer:
 
 ```console
-javac -verbose -extdirs "" -bootclasspath "/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/rt.jar" Pizza.java
+[loading ZipFileIndexFileObject[/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/lib/ct.sym(META-INF/sym/rt.jar/java/lang/Object.class)]]
+``` 
+
+`java.lang` lives in `rt.jar/java/lang/Object.class`.
+
+Side note: this might seem like a trivial observation...but...uh...it was _not_. I learned about classloaders from [this excellent blog post](https://blog.cdap.io/2015/08/java-class-loading-and-distributed-data-processing-frameworks/), and stumbled on some discussion about the `rt.jar` on Stack Overflow or something, then read [JDK and JRE File Structure](https://docs.oracle.com/javase/7/docs/technotes/tools/solaris/jdkfiles.html), then noodled for a bit, re-read the error message and _got it_.
+
+The bottom line is I will use the following command as my baseline from here. It reveals the information I need without bloating the concole output.
+
+```console
+javac \
+-verbose \
+-classpath "" \
+-extdirs "" \
+-bootclasspath "/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/rt.jar" \
+Pizza.java
 ```
 
-## Back to javac
+## javac continued...
 
 I want to make this a little more realistic, so I'll add a dependency to `Pizza.java`:
 
@@ -129,7 +139,14 @@ public class Sauce {}
 Compiling, using my lengthy command:
 
 ```console
-$ javac -verbose -extdirs "" -bootclasspath "/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/rt.jar" Pizza.java
+$ javac \
+  -verbose \
+  -classpath "" \
+  -extdirs "" \
+  -bootclasspath "/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/rt.jar" \
+  Pizza.java
+```
+```console
 [parsing started RegularFileObject[Pizza.java]]
 [parsing completed 28ms]
 [search path for source files: .]
@@ -153,7 +170,7 @@ $ javac -verbose -extdirs "" -bootclasspath "/Library/Java/JavaVirtualMachines/j
 
 Suppose I put my classes in packages now. That's what everyone does, right? And it's supposed to make the `-classpath`, hard, right? See [this blog post](https://www.antwerkz.com/?author=4ea18300d09aa9e3f3298e5e) if you want to be called a "beginner" 4 times (this flavor of condescension is one of my pet-peaves...).
 
-Anyway, take a gander at the following same classes, now in a package:
+Anyway, look at the following same classes, now in a package:
 
 ```console
 .
@@ -172,17 +189,32 @@ public class Pizza {
 }
 ```
 
-Compiling, we get an error:
+Compiling, using the same command...
 
 ```console
-$ javac -verbose -extdirs "" -bootclasspath "/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/rt.jar" Pizza.java
+$ javac \
+  -verbose \
+  -classpath "" \
+  -extdirs "" \
+  -bootclasspath "/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/rt.jar" \
+  Pizza.java
+```
+I get an error:
+```console
 javac: file not found: Pizza.java
 ```
 
 This makes sense. `Pizza.java` is now in a package (and corresponding nested directory) called `food.machine` so I have to refer to it relatively:
 
 ```console
-$ javac -verbose -extdirs "" -bootclasspath "/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/rt.jar" food/machine/Pizza.java
+$ javac \
+  -verbose \
+  -classpath "" \
+  -extdirs "" \
+  -bootclasspath "/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/rt.jar" \
+  food/machine/Pizza.java
+```
+```console
 [parsing started RegularFileObject[food/machine/Pizza.java]]
 [parsing completed 30ms]
 [search path for source files: .]
@@ -193,9 +225,9 @@ This works just fine. `-classpath` defaults to the current directory, `.`, so I 
 
 ## out
 
-I still haven't touched `-classpath`, but hopefully with the motivation above, the following stuff seems easier than just dropping you in at this point.
+I still haven't really done anything with the `-classpath` option yet (except zero it out), but hopefully with the motivation above, the following stuff seems easier than just dropping you in at this point.
 
-Usually folks (and IDEs) tell the compiler to deposit their `.class` files in a different directory. I can do this by adding the `-d` option to the compiler command:
+Usually folks (and IDEs) tell the compiler to deposit their `.class` files in a different directory. I can do this by adding the `-d` option to the compiler command along with a new directory called `out`:
 
 ```console
 $ mkdir out
@@ -206,7 +238,15 @@ $ mkdir out
 │       └── Sauce.java
 └── out
 
-$ javac -verbose -d out -extdirs "" -bootclasspath "/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/rt.jar" food/machine/Pizza.java
+$ javac \
+  -verbose \
+  -d out \
+  -classpath "" \
+  -extdirs "" \
+  -bootclasspath "/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/rt.jar" \
+  food/machine/Pizza.java
+```
+```console
 [parsing started RegularFileObject[food/machine/Pizza.java]]
 ...
 [search path for source files: .]
@@ -229,9 +269,11 @@ $ javac -verbose -d out -extdirs "" -bootclasspath "/Library/Java/JavaVirtualMac
             └── Sauce.class
 ```
 
-So, above, I add `-d out` to my compiler command and the compiler helpfully places my `.class` files in my new `out` directory with a directory structure that matches my sources. I could continue compiling in this way, but it's inefficient. 
+So, above, I add `-d out` to my compiler command and the compiler helpfully places my `.class` files in my new `out` directory with a directory structure that mirrors my sources. I could continue compiling in this way, but it's inefficient. 
 
-`Pizza` depends on `Sauce` but if I make a change to `Pizza` only, I don't need to re-compile `Sauce`. To take advantage of this, I will use the `-classpath` option:
+## Avoid compiling when you can
+
+`Pizza` depends on `Sauce` but if I make a change to `Pizza` only, I don't need to re-compile `Sauce`. To take advantage of this, I will (finally) use the `-classpath` option. Here is a little change to `Pizza`:
 
 ```java
 package food.machine;
@@ -244,7 +286,16 @@ public class Pizza {
 Compiling again, but this time taking advantage of the `-classpath` option, I get:
 
 ```console
-$ javac -verbose -d out -classpath out -extdirs "" -bootclasspath "/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/rt.jar" food/machine/Pizza.java
+$ javac \
+  -verbose \
+  -d out \
+  -classpath out \
+  -extdirs "" \
+  -bootclasspath "/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/rt.jar" \
+  food/machine/Pizza.java
+```
+
+```console
 [parsing started RegularFileObject[food/machine/Pizza.java]]
 ...
 [search path for source files: out]
@@ -253,9 +304,7 @@ $ javac -verbose -d out -classpath out -extdirs "" -bootclasspath "/Library/Java
 ...
 ```
 
-The first thing to notice is that `out` is in the class search path (`[search path for source files: out]`). So the compiler will try to get `.class` files from that location before compiling from sources. 
-
-The next interesting thing is that when I use the `-classpath` option, I only load `Sauce.class`, rather than previously loading `Sauce.java`, then parsing it, then writing `Sauce.class`. This is a much trimmer operation and although the example here is small, you can image the compile-time savings adding up if a project contains hundreds or thousands of classes that need to be compiled but have not changed. 
+The first thing to notice is that `out` is in the class search path (`[search path for source files: out]`). So the compiler will try to get `.class` files from that location before compiling from sources. I only load `Sauce.class`, rather than previously loading `Sauce.java`, then parsing it, then writing `Sauce.class`. This is a much trimmer operation and you can image the compile-time savings if a project contains hundreds or thousands of classes that do not need to compile because they have not changed.
 
 ## lib
 
@@ -278,7 +327,7 @@ To do so, I add a `lib` directory to my project, download (arbitrarily) `guava-2
             └── Sauce.class
 ```  
 
-Now I'll make a tiny change to `Pizza.java`:
+Now I'll make a tiny change to `Pizza.java` that depends on a class in `guava-27.0.1-jre.jar`:
 
 ```java
 package food.machine;
@@ -290,7 +339,16 @@ public class Pizza {
 
 Compiling:
 ```java
-$ javac -verbose -d out -classpath out -extdirs "" -bootclasspath "/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/rt.jar" food/machine/Pizza.java
+$ javac \
+  -verbose \
+  -d out \
+  -classpath out \
+  -extdirs "" \
+  -bootclasspath "/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/rt.jar" \
+  food/machine/Pizza.java
+```
+I get an error:
+```console
 [parsing started RegularFileObject[food/machine/Pizza.java]]
 ...
 [search path for source files: out]
@@ -300,10 +358,18 @@ food/machine/Pizza.java:4: error: package com.google.common.math does not exist
                                             ^
 ```
 
-The compiler cannot find `guava-27.0.1-jre.jar` because it is not on the class search path, which, from the output above `[search path for source files: out]`, only contains `out`. This is an easy fix, I just add the jar to the class search path after a colon `:` and compile again:
+The compiler cannot find `guava-27.0.1-jre.jar` because it is not on the class search path, which, from the output above `[search path for source files: out]`, only contains `out`. This is easy to fix, I just add `guava-27.0.1-jre.jar` to the class search path after a colon `:` and compile again:
 
 ```java
-$ javac -verbose -d out -classpath out:lib/guava-27.0.1-jre.jar -extdirs "" -bootclasspath "/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/rt.jar" food/machine/Pizza.java
+javac \
+-verbose \
+-d out \
+-classpath out:lib/guava-27.0.1-jre.jar \
+-extdirs "" \
+-bootclasspath "/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/rt.jar" \
+food/machine/Pizza.java
+```
+```console
 [parsing started RegularFileObject[food/machine/Pizza.java]]
 ...
 [search path for source files: out,lib/guava-27.0.1-jre.jar]
@@ -315,13 +381,11 @@ $ javac -verbose -d out -classpath out:lib/guava-27.0.1-jre.jar -extdirs "" -boo
 ...
 ```
 
-NOTE: I can't just drop in the jar, I need to provide its path too. 
-
-
+Note that `lib/guava-27.0.1-jre.jar`, which I added to the `-classpath` option, is **relative**. Forgetting the relative path of your new jar is "a very common error" Boone says. I _might_ have made this mistake when writing this post a time or two.
 
 ## Conclusion
 
-I spent a ton of time understanding the class search path. Stumbling on the `-verbose` flag yielded enormous benefits. I read blogs and the docs (see my sources below) but the _point_ of the classpath and bending it to my will wasn't clicking until I stripped everything away and started experimenting. This is a slow process but I'm glad I went through it and hopefully I've saved you some time with the presentation above.
+I spent a ton of time understanding the class search path. Stumbling on the `-verbose` flag was fortuitous. I read blogs and the docs (see my sources below) but the _point_ of the classpath and bending it to my will wasn't clicking until I stripped everything away and started experimenting. This was a _slow_ process but I'm glad I went through it and hopefully I've saved you some time with the presentation above.
 
 ## Sources
 
