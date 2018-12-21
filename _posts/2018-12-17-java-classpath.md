@@ -9,7 +9,7 @@ categories: java
 
 This post is about the class path (short for the "class search path" <sup>[docs](https://docs.oracle.com/javase/8/docs/technotes/tools/windows/classpath.html)</sup> and also un-officially one-worded as "classpath" <sup>[Boone](http://kevinboone.net/classpath.html)</sup> and maybe more precisely referred-to as the `-classpath` option), "the path that the Java Runtime Environment (JRE) searches for classes and other resource files."
 
-IDEs make it easy to forget about the classpath . Oftentimes I create a new project, my IDE does some stuff, then I click a little green triangle and my program compiles or runs or whatever. Today I'm pulling back the curtain and breaking down the `-classpath` option from the beginning.
+IDEs make it easy to forget about the classpath . Oftentimes I create a new project, my IDE does some stuff, then I click a little green triangle and my program compiles or runs or whatever. Today I'm breaking down the `-classpath` option from the beginning.
 
 
 
@@ -56,7 +56,7 @@ $ javac -verbose Pizza.java
 [total 324ms]
 ```
 
-Adding the `-verbose` option outputs "messages about what the compiler is doing." But the output is dense and I would like to clean it up, so I'll zero everything. Note: from here on out, I'm splitting the command over several lines, one option per line, to make it easier to read. 
+Adding the `-verbose` option outputs "messages about what the compiler is doing." But the output is dense and I would like to clean it up, so I'll zero-out everything. Note: from here on out, I'm splitting the command over several lines, one option per line, to make it easier to read. 
 
 ```console
 $ javac \
@@ -107,11 +107,11 @@ Looking at, say, this line from the original `javac -verbose Pizza.java` command
 [loading ZipFileIndexFileObject[/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/lib/ct.sym(META-INF/sym/rt.jar/java/lang/Object.class)]]
 ``` 
 
-`java.lang` lives in `rt.jar/java/lang/Object.class`.
+The compiler loads `Object.class`, which lives in `java/lang`, which lives in `rt.jar`.
 
-Side note: this might seem like a trivial observation...but...uh...it was _not_. I learned about classloaders from [this excellent blog post](https://blog.cdap.io/2015/08/java-class-loading-and-distributed-data-processing-frameworks/), and stumbled on some discussion about the `rt.jar` on Stack Overflow or something, then read [JDK and JRE File Structure](https://docs.oracle.com/javase/7/docs/technotes/tools/solaris/jdkfiles.html), then noodled for a bit, re-read the error message and _got it_.
+Side note: this might seem like a trivial observation...but...uh...it was _not_. I learned about classloaders from [this excellent blog post](https://blog.cdap.io/2015/08/java-class-loading-and-distributed-data-processing-frameworks/), and stumbled on some discussion about the `rt.jar` on Stack Overflow or something, then read [JDK and JRE File Structure](https://docs.oracle.com/javase/7/docs/technotes/tools/solaris/jdkfiles.html), then noodled for a bit, re-read the error message and finally _got it_.
 
-The bottom line is I will use the following command as my baseline from here. It reveals the information I need without bloating the concole output.
+The bottom line is I will use the following command as my baseline from here. It reveals the information I need without bloating the console output.
 
 ```console
 javac \
@@ -168,7 +168,7 @@ $ javac \
 
 ## Packages
 
-Suppose I put my classes in packages now. That's what everyone does, right? And it's supposed to make the `-classpath`, hard, right? See [this blog post](https://www.antwerkz.com/?author=4ea18300d09aa9e3f3298e5e) if you want to be called a "beginner" 4 times (this flavor of condescension is one of my pet-peaves...).
+Suppose I put my classes in a package. That's what everyone does, right? And it's supposed to make the `-classpath`, hard, right? See [this blog post](https://www.antwerkz.com/blog/the-classpath) if you want to be called a beginner four times (this flavor of condescension is one of my pet-peaves...) and look [here](http://kevinboone.net/classpath.html) for the reality check that "there is a widespread lack of comprehension, even among experienced developers" about the `-classpath` option. I'm just saying that humility is a real thing.
 
 Anyway, look at the following same classes, now in a package:
 
@@ -271,7 +271,7 @@ $ javac \
 
 So, above, I add `-d out` to my compiler command and the compiler helpfully places my `.class` files in my new `out` directory with a directory structure that mirrors my sources. I could continue compiling in this way, but it's inefficient. 
 
-## Avoid compiling when you can
+## Avoid compiling when possible
 
 `Pizza` depends on `Sauce` but if I make a change to `Pizza` only, I don't need to re-compile `Sauce`. To take advantage of this, I will (finally) use the `-classpath` option. Here is a little change to `Pizza`:
 
@@ -283,7 +283,7 @@ public class Pizza {
 }
 ```
 
-Compiling again, but this time taking advantage of the `-classpath` option, I get:
+Compiling again, but this time taking advantage of the `-classpath` option by adding `out` (where my `.class` bytecode files live)...
 
 ```console
 $ javac \
@@ -294,7 +294,7 @@ $ javac \
   -bootclasspath "/Library/Java/JavaVirtualMachines/jdk1.8.0_101.jdk/Contents/Home/jre/lib/rt.jar" \
   food/machine/Pizza.java
 ```
-
+ I get:
 ```console
 [parsing started RegularFileObject[food/machine/Pizza.java]]
 ...
@@ -304,7 +304,10 @@ $ javac \
 ...
 ```
 
-The first thing to notice is that `out` is in the class search path (`[search path for source files: out]`). So the compiler will try to get `.class` files from that location before compiling from sources. I only load `Sauce.class`, rather than previously loading `Sauce.java`, then parsing it, then writing `Sauce.class`. This is a much trimmer operation and you can image the compile-time savings if a project contains hundreds or thousands of classes that do not need to compile because they have not changed.
+Notice that `out` is in the class search path: `[search path for source files: out]`. So the compiler will try to get `.class` files from that location before compiling from sources. I load `Sauce.class`, the _bytecode_, rather than loading/parsing/writing `Sauce.java`, the _source code_.
+
+
+This is a much trimmer operation and you can image the compile-time savings if a project contains hundreds or thousands of classes that do not need to compile because they have not changed.
 
 ## lib
 
@@ -381,11 +384,13 @@ food/machine/Pizza.java
 ...
 ```
 
-Note that `lib/guava-27.0.1-jre.jar`, which I added to the `-classpath` option, is **relative**. Forgetting the relative path of your new jar is "a very common error" Boone says. I _might_ have made this mistake when writing this post a time or two.
+Hooray! The code compiles!
+
+Note that `lib/guava-27.0.1-jre.jar`, which I added to the `-classpath` option, is **relative**. Forgetting the relative path of your new jar is "a very common error" Boone says. I _might_ have made this mistake a time or two when writing this post.
 
 ## Conclusion
 
-I spent a ton of time understanding the class search path. Stumbling on the `-verbose` flag was fortuitous. I read blogs and the docs (see my sources below) but the _point_ of the classpath and bending it to my will wasn't clicking until I stripped everything away and started experimenting. This was a _slow_ process but I'm glad I went through it and hopefully I've saved you some time with the presentation above.
+I spent a ton of time understanding the class search path. Stumbling on the `-verbose` flag was fortuitous. I read blogs and the docs (see my sources below) but the _point_ of the classpath and bending it to my will wasn't clicking until I stripped everything away and started experimenting. This was a _very slow_ process but I'm glad I went through it and hopefully I saved you some time with the presentation above.
 
 ## Sources
 
@@ -393,7 +398,7 @@ Blogs
 
 + [Kevin Boone: Mastering the Java CLASSPATH](http://kevinboone.net/classpath.html)
 + [Terence Yim: Java Class Loading and Distributed Data Processing Frameworks](https://blog.cdap.io/2015/08/java-class-loading-and-distributed-data-processing-frameworks/)
-+ [Justin Lee: The Classpath](https://www.antwerkz.com/?author=4ea18300d09aa9e3f3298e5e)
++ [Justin Lee: The Classpath](https://www.antwerkz.com/blog/the-classpath)
 
 Official
 + [Setting the Class Path](https://docs.oracle.com/javase/8/docs/technotes/tools/windows/classpath.html)
