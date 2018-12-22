@@ -1,7 +1,7 @@
 ---
 layout: post
 title:  "The class path, class search path, classpath thing...and you"
-date:   2018-12-17 21:00:00 -0700
+date:   2018-12-20 21:00:00 -0700
 categories: java
 ---
 
