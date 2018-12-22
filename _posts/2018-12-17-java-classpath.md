@@ -361,7 +361,7 @@ food/machine/Pizza.java:4: error: package com.google.common.math does not exist
                                             ^
 ```
 
-The compiler cannot find `guava-27.0.1-jre.jar` because it is not on the class search path, which, from the output above `[search path for source files: out]`, only contains `out`. This is easy to fix, I just add `guava-27.0.1-jre.jar` to the class search path after a colon `:` and compile again:
+The compiler does not know `guava-27.0.1-jre.jar` exists. It retrieves the classes in each directory or jar specified in the class search path and cannot find `com.google.common.math` and throws. This is easy to fix, I just add `guava-27.0.1-jre.jar` to the class search path after a colon `:` and compile again:
 
 ```java
 javac \
