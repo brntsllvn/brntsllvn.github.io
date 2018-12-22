@@ -9,7 +9,7 @@ categories: java
 
 This post is about the class path (short for the "class search path" <sup>[docs](https://docs.oracle.com/javase/8/docs/technotes/tools/windows/classpath.html)</sup> and also un-officially one-worded as "classpath" <sup>[Boone](http://kevinboone.net/classpath.html)</sup> and maybe more precisely referred-to as the `-classpath` option), "the path that the Java Runtime Environment (JRE) searches for classes and other resource files."
 
-IDEs make it easy to forget about the classpath . Oftentimes I create a new project, my IDE does some stuff, then I click a little green triangle and my program compiles or runs or whatever. Today I'm breaking down the `-classpath` option from the beginning.
+IDEs make it easy to forget about the classpath. Oftentimes I create a new project, my IDE does some stuff, then I click a little green triangle and my program compiles or runs or whatever. Today I'm breaking down the `-classpath` option from the beginning.
 
 
 
