@@ -12,6 +12,12 @@ This post is about the class path (short for the "class search path" <sup>[docs]
 IDEs make it easy to forget about the classpath. Oftentimes I create a new project, my IDE does some stuff, then I click a little green triangle and my program compiles or runs or whatever. Today I'm breaking down the `-classpath` option from the beginning.
 
 
+## Screencast
+
+If you prefer watching versus reading, check out my screencast about this post!
+
+{% include screencasts.html id="kVgYLYYcxN8" %}
+
 
 ## javac
 
