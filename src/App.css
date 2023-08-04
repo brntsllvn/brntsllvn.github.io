@@ -28,6 +28,13 @@
   color: #61dafb;
 }
 
+ul.custom-bullets li {
+  list-style-type: disc;
+  margin: 0;
+  padding: 0;
+  margin-left: 1.5rem;
+}
+
 @keyframes App-logo-spin {
   from {
     transform: rotate(0deg);
