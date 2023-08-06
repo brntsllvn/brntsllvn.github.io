@@ -1,5 +1,5 @@
-import React, { useState } from "react";
-import html2canvas from "html2canvas";
+import React, { useState, useRef } from "react";
+import * as htmlToImage from "html-to-image";
 
 enum RadioValue {
   Option1 = "option1",
@@ -73,20 +73,21 @@ const InputWithRadioButtons: React.FC<InputProps> = ({
 
 const ViableStartupCalculator: React.FC = () => {
   const [inputResults, setInputResults] = useState<number[]>([0, 0, 0, 0]);
-  const [totalResult, setTotalResult] = useState<number>(0);
+  const screenshotRef = useRef(null);
 
   const handleScreenshotDownload = async () => {
-    const body = document.body;
-    const screenshotTarget = body ? body : document.documentElement;
-
-    if (screenshotTarget) {
-      const canvas = await html2canvas(screenshotTarget);
-      const imgData = canvas.toDataURL("image/png");
-
-      const a = document.createElement("a");
-      a.href = imgData;
-      a.download = "screenshot.png";
-      a.click();
+    if (screenshotRef.current) {
+      try {
+        const dataUrl = await htmlToImage.toPng(screenshotRef.current);
+        const link = document.createElement("a");
+        link.href = dataUrl;
+        link.download = "screenshot.png";
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+      } catch (error) {
+        console.error("Failed to download the screenshot:", error);
+      }
     }
   };
 
@@ -96,59 +97,47 @@ const ViableStartupCalculator: React.FC = () => {
       newResults[index] = result;
       return newResults;
     });
-
-    // Recompute the total result whenever any input result changes
-    const newTotalResult = inputResults.reduce(
-      (total, result) => total * result,
-      1
-    );
-    setTotalResult(newTotalResult);
   };
 
   const calculateTotalResult = () => {
     return inputResults.reduce((total, result) => total * result, 1);
   };
 
+  const totalResult = calculateTotalResult();
+
   return (
     <div
-      className={`bg-${
-        calculateTotalResult() > 0 ? "green" : "red"
-      }-500 mt-100`}
+      className={`bg-${totalResult > 0 ? "blue" : "red"}-500 mt-100`}
+      ref={screenshotRef}
     >
-      <div>
-        <div>
-          <div className="text-red-500 text-8xl">TechvBlogs</div>
-          <label>
-            Name of startup:
-            <input type="text" />
-          </label>
-        </div>
-        <div>
-          <label>
-            Startup idea in 1 sentence:
-            <input type="text" />
-          </label>
-        </div>
-        <div className="bg-green-400">
-          <InputWithRadioButtons
-            label="Input 1:"
-            onResultChange={(result) => handleInputResultChange(0, result)}
-          />
-          <InputWithRadioButtons
-            label="Input 2:"
-            onResultChange={(result) => handleInputResultChange(1, result)}
-          />
-          <InputWithRadioButtons
-            label="Input 3:"
-            onResultChange={(result) => handleInputResultChange(2, result)}
-          />
-          <InputWithRadioButtons
-            label="Input 4:"
-            onResultChange={(result) => handleInputResultChange(3, result)}
-          />
-          <div>Total Result: {calculateTotalResult()}</div>
-          <button onClick={handleScreenshotDownload}>Save Screenshot</button>
-        </div>
+      <h1 className="text-red-500 text-8xl">TechvBlogs</h1>
+      <label>
+        Name of startup:
+        <input type="text" />
+      </label>
+      <label>
+        Startup idea in 1 sentence:
+        <input type="text" />
+      </label>
+      <div className="bg-green-400">
+        <InputWithRadioButtons
+          label="Input 1:"
+          onResultChange={(result) => handleInputResultChange(0, result)}
+        />
+        <InputWithRadioButtons
+          label="Input 2:"
+          onResultChange={(result) => handleInputResultChange(1, result)}
+        />
+        <InputWithRadioButtons
+          label="Input 3:"
+          onResultChange={(result) => handleInputResultChange(2, result)}
+        />
+        <InputWithRadioButtons
+          label="Input 4:"
+          onResultChange={(result) => handleInputResultChange(3, result)}
+        />
+        <div>Total Result: {totalResult}</div>
+        <button onClick={handleScreenshotDownload}>Save Screenshot</button>
       </div>
     </div>
   );
