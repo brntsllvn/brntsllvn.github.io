@@ -1,5 +1,4 @@
-import React, { useState, useRef } from "react";
-import * as htmlToImage from "html-to-image";
+import React, { useState } from "react";
 import Nav from "./Nav";
 
 interface Option {
@@ -12,6 +11,8 @@ interface InputProps {
   subscript: string;
   options: Option[];
   onResultChange: (result: number) => void;
+  onOptionChange: (option: string) => void;
+  selectedOption: string;
 }
 
 const InputWithDropdown: React.FC<InputProps> = ({
@@ -19,12 +20,12 @@ const InputWithDropdown: React.FC<InputProps> = ({
   subscript,
   options,
   onResultChange,
+  onOptionChange,
+  selectedOption,
 }) => {
-  const [selectedOption, setSelectedOption] = useState<string | null>(null);
-
   const handleOptionChange = (event: React.ChangeEvent<HTMLSelectElement>) => {
     const selectedValue = event.target.value;
-    setSelectedOption(selectedValue);
+    onOptionChange(selectedValue);
     const selectedOption = options.find(
       (option) => option.label === selectedValue
     );
@@ -35,14 +36,14 @@ const InputWithDropdown: React.FC<InputProps> = ({
   };
 
   return (
-    <div className="py-2 pb-4">
-      <div className="text-xl">{label}</div>
-      <div className="text-xs">{subscript}</div>
+    <div className="py-2 pb-1">
+      <div>{label}</div>
+      <div className="text-[9px]">{subscript}</div>
       <div>
         <select
           value={selectedOption || ""}
           onChange={handleOptionChange}
-          className="form-select mt-1 block w-full rounded-md bg-gray-200 text-gray-800"
+          className="form-select mt-1 block w-full rounded-md bg-white-200 text-gray-800"
         >
           <option value="" disabled>
             Select an option
@@ -62,22 +63,40 @@ const ViableStartupCalculator: React.FC = () => {
   const [inputResults, setInputResults] = useState<number[]>([
     0, 0, 0, 0, 0, 0, 0,
   ]);
-  const screenshotRef = useRef(null);
+  const [selectedOptions, setSelectedOptions] = useState<string[]>([
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+    "",
+  ]);
 
-  const handleScreenshotDownload = async () => {
-    if (screenshotRef.current) {
-      try {
-        const dataUrl = await htmlToImage.toPng(screenshotRef.current);
-        const link = document.createElement("a");
-        link.href = dataUrl;
-        link.download = "screenshot.png";
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      } catch (error) {
-        console.error("Failed to download the screenshot:", error);
-      }
-    }
+  const handleInputOptionChange = (index: number, option: string) => {
+    setSelectedOptions((prevOptions) => {
+      const newOptions = [...prevOptions];
+      newOptions[index] = option;
+      return newOptions;
+    });
+  };
+
+  const exampleData = [
+    // Replace this with your actual example data
+    { result: 10000000, option: "10,000,000" },
+    { result: 0.01, option: "0.01: Few agree or care" },
+    { result: 10000, option: "$10,000" },
+    { result: 0.01, option: "0.01: Every few years" },
+    { result: 0.1, option: "0.1: Structural/trust challenges" },
+    { result: 0.5, option: "0.5: Some best-in-class features" },
+    { result: 0.1, option: "0.1 : One-off purchase with evangelism" },
+  ];
+
+  const handleFillExampleData = () => {
+    const exampleResults = exampleData.map((data) => data.result);
+    setInputResults(exampleResults);
+    const exampleOptions = exampleData.map((data) => data.option);
+    setSelectedOptions(exampleOptions);
   };
 
   const handleInputResultChange = (index: number, result: number) => {
@@ -121,8 +140,6 @@ const ViableStartupCalculator: React.FC = () => {
   let bgColorClass = calculateResultColor(totalResult);
 
   const optionsArray = [
-    // Define the options for each InputWithDropdown here
-    // Replace the following with your actual options
     {
       label: "Plausible",
       subscript: "Number of potential customers (consumers or businesses)",
@@ -148,7 +165,7 @@ const ViableStartupCalculator: React.FC = () => {
         { value: 0.5, label: "0.5: Industry standard-practice" },
         {
           value: 1.0,
-          label: "1.0: Hard to find someone who doesn’t care",
+          label: "1.0: Hard to find someone who doesn't care",
         },
       ],
     },
@@ -217,34 +234,70 @@ const ViableStartupCalculator: React.FC = () => {
   return (
     <div>
       <Nav />
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-min flex items-center justify-center px-2 mt-8">
         <div
-          className={`w-full max-w-xl mx-auto p-6 ${bgColorClass} mt-4 rounded-lg shadow-md`}
-          ref={screenshotRef}
+          className={`w-full max-w-md mx-auto px-4 py-8 ${bgColorClass} rounded-lg shadow-md`}
         >
-          <h1 className="text-black text-5xl font-bold text-center mb-4">
+          <h1 className="text-black text-2xl font-bold text-center mb-4">
             Is My Startup Viable?
           </h1>
-          <div className="text-black font-bold text-center">
-            Result: {calculateResult(totalResult)}
+          <div className="flex justify-between items-center mt-2 px-4">
+            <div className="text-black font-semibold text-sm">
+              Score: {totalResult}
+            </div>
+            <div className="text-black font-semibold text-sm">
+              Result: {calculateResult(totalResult)}
+            </div>
           </div>
-          <div className="space-y-4">
-            <label className="block">
-              <span className="text-black">Name of startup</span>
-              <input
-                className="form-input mt-1 block w-full rounded-md bg-white-200 text-gray-800"
-                type="text"
-              />
-            </label>
-            <label className="block">
-              <span className="text-black">Startup idea in one sentence</span>
-              <input
-                className="form-input mt-1 block w-full rounded-md bg-white-200 text-gray-800"
-                type="text"
-              />
-            </label>
+          <div className="flex items-center mt-2 px-4 text-xs text-black gap-4">
+            <div>Examples:</div>
+            <button
+              className="border border-gray-300 p-1"
+              onClick={handleFillExampleData}
+            >
+              WP Engine
+            </button>
+            <button
+              className="border border-gray-300 p-1"
+              onClick={handleFillExampleData}
+            >
+              WP Engine
+            </button>
+            <button
+              className="border border-gray-300 p-1"
+              onClick={handleFillExampleData}
+            >
+              WP Engine
+            </button>
           </div>
-          <div className="bg-slate-400 p-4 rounded-lg mt-4">
+          <div className="px-4 mt-6">
+            <div className="bg-gray-300 h-0.5"></div>
+          </div>
+          <div className="px-4 rounded-lg mt-4">
+            <div className="py-2 pb-1">
+              <label className="block">
+                <span className="text-black">Name of startup</span>
+                <div className="text-[9px] pb-1">
+                  Helpful for capturing the business in one word
+                </div>
+                <input
+                  className="form-input block w-full rounded-md bg-white-200 text-black text-sm p-2 h-5"
+                  type="text"
+                />
+              </label>
+            </div>
+            <div className="py-2 pb-1">
+              <label className="block">
+                <span className="text-black">Startup idea in one sentence</span>
+                <div className="text-[9px] pb-1">
+                  What would the "h1" tag on your main landing page say?
+                </div>
+                <input
+                  className="form-input block w-full rounded-md bg-white-200 text-black text-sm p-2 h-5"
+                  type="text"
+                />
+              </label>
+            </div>
             {optionsArray.map((optionData, index) => (
               <InputWithDropdown
                 key={index}
@@ -254,15 +307,12 @@ const ViableStartupCalculator: React.FC = () => {
                 onResultChange={(result) =>
                   handleInputResultChange(index, result)
                 }
+                onOptionChange={(option) =>
+                  handleInputOptionChange(index, option)
+                }
+                selectedOption={selectedOptions[index]}
               />
             ))}
-            <div className="text-black font-bold">Score: {totalResult}</div>
-            <button
-              className="bg-blue-500 hover:bg-blue-700 text-black font-bold py-2 px-4 rounded mt-4"
-              onClick={handleScreenshotDownload}
-            >
-              Save Screenshot
-            </button>
           </div>
         </div>
       </div>
